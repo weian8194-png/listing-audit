@@ -1,58 +1,64 @@
-const cheerio = require('cheerio');
+// Listing CDQ/LQI Audit API - Zero external dependencies, pure regex parsing
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
   'Accept-Language': 'en-US,en;q=0.9',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Connection': 'keep-alive',
-  'Cache-Control': 'max-age=0',
 };
+
+function jsonRes(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+  });
+}
 
 async function fetchAmazon(asin) {
   const url = `https://www.amazon.com/dp/${asin}`;
   try {
-    const resp = await fetch(url, { headers: HEADERS, redirect: 'follow', signal: AbortSignal.timeout(20000) });
-    if (!resp.ok) return { error: `Amazon returned ${resp.status}`, asin, url };
+    const resp = await fetch(url, {
+      headers: HEADERS,
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) return { error: `Amazon returned status ${resp.status}`, asin, url };
     const html = await resp.text();
-    const $ = cheerio.load(html);
 
-    // Remove script/style tags
-    $('script, style').remove();
+    // Clean script/style
+    let clean = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    clean = clean.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
 
     const data = { asin, url };
 
     // Title
-    data.title = $('#productTitle').text().trim() || 'N/A';
+    const titleMatch = clean.match(/id="productTitle"[^>]*>\s*([\s\S]*?)\s*<\/span>/);
+    data.title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : 'N/A';
 
     // Brand
-    const brandEl = $('#bylineInfo');
-    if (brandEl.length) {
-      data.brand = brandEl.text().trim().replace('Visit the ', '').replace(' Store', '').replace('Brand: ', '');
+    const brandMatch = clean.match(/id="bylineInfo"[^>]*>\s*([\s\S]*?)\s*<\/(?:a|span|div)/);
+    if (brandMatch) {
+      data.brand = brandMatch[1].replace(/<[^>]+>/g, '').trim()
+        .replace('Visit the ', '').replace(' Store', '').replace('Brand: ', '');
     } else {
       data.brand = 'N/A';
     }
 
-    // Price - multi-pattern
+    // Price
     let price = 'N/A';
-    const wholeEl = $('.a-price-whole').first();
-    const fractionEl = $('.a-price-fraction').first();
-    if (wholeEl.length) {
-      const w = wholeEl.text().trim().replace(/,/g, '').replace(/\.$/, '');
-      const f = fractionEl.length ? fractionEl.text().trim() : '00';
-      price = `${w}.${f}`;
+    // Pattern 1: a-price-whole + a-price-fraction
+    const pwMatch = clean.match(/class="a-price-whole"[^>]*>\s*\$?([\d,.]+)/);
+    const pfMatch = clean.match(/class="a-price-fraction"[^>]*>\s*(\d+)/);
+    if (pwMatch) {
+      price = pwMatch[1].replace(/,/g, '').replace(/\.$/, '') + '.' + (pfMatch ? pfMatch[1] : '00');
     } else {
-      const offscreen = $('.a-offscreen').first();
-      if (offscreen.length) {
-        const m = offscreen.text().match(/[\d,.]+/);
-        if (m) price = m[0].replace(/,/g, '');
-      } else {
+      // Pattern 2: a-offscreen
+      const offMatch = clean.match(/class="a-offscreen"[^>]*>\s*\$?([\d,.]+)/);
+      if (offMatch) price = offMatch[1].replace(/,/g, '');
+      else {
+        // Pattern 3: priceblock
         for (const pid of ['priceblock_ourprice', 'priceblock_dealprice', 'priceblock_saleprice']) {
-          const el = $(`#${pid}`);
-          if (el.length) {
-            const m = el.text().match(/[\d,.]+/);
-            if (m) { price = m[0].replace(/,/g, ''); break; }
-          }
+          const pm = clean.match(new RegExp(`id="${pid}"[^>]*>\\s*\\$?([\\d,.]+)`));
+          if (pm) { price = pm[1].replace(/,/g, ''); break; }
         }
       }
     }
@@ -63,52 +69,59 @@ async function fetchAmazon(asin) {
     data.rating = ratingMatch ? ratingMatch[1] : 'N/A';
 
     // Review count
-    const reviewEl = $('#acrCustomerReviewText');
-    if (reviewEl.length) {
-      const m = reviewEl.text().match(/([\d,]+)/);
-      data.review_count = m ? m[1].replace(/,/g, '') : 'N/A';
-    } else {
-      data.review_count = 'N/A';
-    }
+    const reviewMatch = html.match(/id="acrCustomerReviewText"[^>]*>\s*([\d,]+)/);
+    data.review_count = reviewMatch ? reviewMatch[1].replace(/,/g, '') : 'N/A';
 
     // Bullets
     const bullets = [];
-    $('#feature-bullets li .a-list-item').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && !text.includes('Make sure this fits') && text.length > 10) {
-        bullets.push(text);
+    const bulletSection = clean.match(/id="feature-bullets"[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/);
+    if (bulletSection) {
+      const items = bulletSection[1].match(/<span class="a-list-item">\s*([\s\S]*?)\s*<\/span>/g);
+      if (items) {
+        for (const item of items) {
+          const text = item.replace(/<[^>]+>/g, '').trim();
+          if (text && !text.includes('Make sure this fits') && text.length > 10) {
+            bullets.push(text);
+          }
+        }
       }
-    });
+    }
     data.bullets = bullets.slice(0, 5).length ? bullets.slice(0, 5) : ['Failed to extract bullets'];
 
     // Tech specs
     const specs = {};
     for (const tableId of ['prodDetTable', 'productDetails_techSpec_section_1']) {
-      const table = $(`#${tableId}`);
-      if (table.length) {
-        table.find('tr').each((_, row) => {
-          const th = $(row).find('th').text().trim();
-          const td = $(row).find('td').text().trim();
-          if (th && td) specs[th] = td;
-        });
+      const tableMatch = html.match(new RegExp(`id="${tableId}"[\\s\\S]*?<tbody>([\\s\\S]*?)<\\/tbody>`));
+      if (tableMatch) {
+        const rows = tableMatch[1].match(/<tr[^>]*>[\s\S]*?<\/tr>/g);
+        if (rows) {
+          for (const row of rows) {
+            const thMatch = row.match(/<th[^>]*>([\s\S]*?)<\/th>/);
+            const tdMatch = row.match(/<td[^>]*>([\s\S]*?)<\/td>/);
+            if (thMatch && tdMatch) {
+              const k = thMatch[1].replace(/<[^>]+>/g, '').trim();
+              const v = tdMatch[1].replace(/<[^>]+>/g, '').trim();
+              if (k && v) specs[k] = v;
+            }
+          }
+        }
         break;
       }
     }
     data.tech_specs = specs;
 
     // Images
-    const imgCount = $('img.a-dynamic-image').length || (html.match(/altImageCard/g) || []).length;
+    const imgCount = (html.match(/data-a-dynamic-image="/g) || []).length || (html.match(/altImageCard/g) || []).length;
     data.images_count = Math.max(imgCount, 1);
 
     // Video
-    data.has_video = !!($('video').length || /video|(?:ivm|vp)\./i.test(html));
+    data.has_video = /video|(?:ivm|vp)\./i.test(html);
 
     // A+
-    data.has_aplus = !!($('.aplus-v2').length || html.includes('aplus'));
+    data.has_aplus = /aplus/.test(html);
 
     // BSR
-    const cleanText = $.text();
-    const bsrMatch = cleanText.match(/#([\d,]+)\s+in\s+([^(<\n]+)/);
+    const bsrMatch = clean.match(/#([\d,]+)\s+in\s+([^(<\n]+)/);
     if (bsrMatch) {
       data.bsr_rank = bsrMatch[1].replace(/,/g, '');
       data.bsr_category = bsrMatch[2].trim();
@@ -139,7 +152,7 @@ function auditListing(data) {
   const titleLower = title.toLowerCase();
   const bulletsText = bullets.join(' ').toLowerCase();
 
-  // CDQ: Special chars in title
+  // CDQ: Special chars
   if (/["""\u201c\u201d\u2033]/.test(title)) {
     cdqIssues.push({ level: 'high', title: '标题含特殊字符(引号)', detail: '引号可能触发CDQ解析异常，建议替换为-Inch或删去' });
     cdqScore -= 10;
@@ -172,13 +185,12 @@ function auditListing(data) {
   for (const [k, v] of Object.entries(specs)) {
     if (/watt|power/i.test(k)) wattageVals[k] = v;
   }
-  const wattageUnique = new Set(Object.values(wattageVals));
-  if (Object.keys(wattageVals).length > 1 && wattageUnique.size > 1) {
+  if (Object.keys(wattageVals).length > 1 && new Set(Object.values(wattageVals)).size > 1) {
     cdqIssues.push({ level: 'high', title: '功率数据不一致', detail: `多值: ${Object.entries(wattageVals).map(([k, v]) => `${k}=${v}`).join(', ')}` });
     cdqScore -= 8;
   }
 
-  // CDQ: Missing important attributes
+  // CDQ: Missing attributes
   const importantAttrs = { 'Noise Level': '噪音等级', 'Certification': '认证', 'Material': '材质', 'Item Weight': '重量', 'Package Dimensions': '包装尺寸', 'Wattage': '功率' };
   const missing = Object.entries(importantAttrs).filter(([a]) => !Object.keys(specs).some(k => k.toLowerCase().includes(a.toLowerCase())));
   if (missing.length) {
@@ -195,13 +207,12 @@ function auditListing(data) {
     cdqScore -= 5;
   }
 
-  // LQI: BPA Free
+  // LQI checks
   if (titleLower.includes('bpa') && !bulletsText.includes('bpa')) {
     lqiIssues.push({ level: 'high', title: 'BPA Free仅标题提及', detail: '五点描述未展开' });
     lqiScore -= 12;
   }
 
-  // LQI: Last bullet quality
   if (bullets.length >= 5) {
     const last = bullets[bullets.length - 1].toLowerCase();
     if (['promise', 'quality', 'guarantee', 'deserve', 'mission', 'committed'].some(w => last.includes(w))) {
@@ -210,7 +221,6 @@ function auditListing(data) {
     }
   }
 
-  // LQI: Images
   if (imagesCount < 7) {
     lqiIssues.push({ level: 'high', title: `图片不足(${imagesCount}张)`, detail: '建议9张以上' });
     lqiScore -= 12;
@@ -219,26 +229,22 @@ function auditListing(data) {
     lqiScore -= 5;
   }
 
-  // LQI: Video
   if (!hasVideo) {
     lqiIssues.push({ level: 'medium', title: '缺少产品视频', detail: '视频提升转化率20%+' });
     lqiScore -= 8;
   }
 
-  // LQI: A+
   if (!hasAplus) {
     lqiIssues.push({ level: 'medium', title: '缺少A+页面', detail: 'A+提升转化3-10%' });
     lqiScore -= 8;
   }
 
-  // LQI: Differentiation
   const diffWords = ['wider', 'larger', 'unique', 'only', 'first', 'exclusive', 'unlike', 'compared'];
   if (!diffWords.some(w => bulletsText.includes(w))) {
     lqiIssues.push({ level: 'medium', title: '卖点缺乏竞品对比', detail: '消费者无法感知差异化' });
     lqiScore -= 6;
   }
 
-  // LQI: Data credibility
   const pctMatch = bulletsText.match(/([\d.]+%)\s*(?:juice|yield|extract)/);
   if (pctMatch && !['test', 'lab', 'certif', 'verif'].some(w => bulletsText.includes(w))) {
     lqiIssues.push({ level: 'low', title: '数据声明缺乏支撑', detail: `"${pctMatch[1]}"无第三方认证` });
@@ -256,7 +262,6 @@ function auditListing(data) {
   else if (overall >= 40) grade = 'Fair';
   else grade = 'Poor';
 
-  // Optimize title
   let optTitle = title.replace(/[""\u201c\u201d\u2033]/g, '-Inch ');
   const seen = new Set();
   const deduped = [];
@@ -274,42 +279,31 @@ function auditListing(data) {
 }
 
 export default async function handler(req) {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+  try {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 200,
+        headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS' },
+      });
+    }
+
+    const u = new URL(req.url);
+    const asin = (u.searchParams.get('asin') || '').trim().toUpperCase();
+
+    if (!asin || !/^[A-Z0-9]{10}$/.test(asin)) {
+      return jsonRes({ error: 'Please enter a valid 10-character ASIN' }, 400);
+    }
+
+    const data = await fetchAmazon(asin);
+
+    if (data.error) {
+      return jsonRes(data);
+    }
+
+    const audit = auditListing(data);
+    return jsonRes({ ...data, audit });
+
+  } catch (err) {
+    return jsonRes({ error: `Server error: ${err.message}` }, 500);
   }
-
-  const url = new URL(req.url);
-  const asin = (url.searchParams.get('asin') || '').trim().toUpperCase();
-
-  if (!asin || !/^[A-Z0-9]{10}$/.test(asin)) {
-    return new Response(JSON.stringify({ error: 'Please enter a valid 10-character ASIN' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  const data = await fetchAmazon(asin);
-
-  if (data.error) {
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  const audit = auditListing(data);
-  const result = { ...data, audit };
-
-  return new Response(JSON.stringify(result), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-  });
 }
