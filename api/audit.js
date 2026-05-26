@@ -1,9 +1,12 @@
-// Listing CDQ/LQI Audit API - Zero external dependencies, pure regex parsing
+// Listing CDQ/LQI Audit API - Edge Runtime (30s timeout, different IP pool)
+export const config = { runtime: 'edge' };
 
 const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
   'Accept-Language': 'en-US,en;q=0.9',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cookie': 'lc-main=en_US',
 };
 
 function jsonRes(data, status = 200) {
@@ -19,10 +22,16 @@ async function fetchAmazon(asin) {
     const resp = await fetch(url, {
       headers: HEADERS,
       redirect: 'follow',
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
     });
-    if (!resp.ok) return { error: `Amazon returned status ${resp.status}`, asin, url };
+    if (!resp.ok) return { error: `Amazon returned status ${resp.status}. Amazon may be blocking serverless requests.`, asin, url };
+
     const html = await resp.text();
+
+    // Check if Amazon returned a CAPTCHA or bot detection page
+    if (html.includes('api-services-support@amazon.com') || html.includes('Robot Check') || html.includes('Type the characters')) {
+      return { error: 'Amazon returned a CAPTCHA/bot detection page. Please try again later or use a different network.', asin, url };
+    }
 
     // Clean script/style
     let clean = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
@@ -45,17 +54,14 @@ async function fetchAmazon(asin) {
 
     // Price
     let price = 'N/A';
-    // Pattern 1: a-price-whole + a-price-fraction
     const pwMatch = clean.match(/class="a-price-whole"[^>]*>\s*\$?([\d,.]+)/);
     const pfMatch = clean.match(/class="a-price-fraction"[^>]*>\s*(\d+)/);
     if (pwMatch) {
       price = pwMatch[1].replace(/,/g, '').replace(/\.$/, '') + '.' + (pfMatch ? pfMatch[1] : '00');
     } else {
-      // Pattern 2: a-offscreen
       const offMatch = clean.match(/class="a-offscreen"[^>]*>\s*\$?([\d,.]+)/);
       if (offMatch) price = offMatch[1].replace(/,/g, '');
       else {
-        // Pattern 3: priceblock
         for (const pid of ['priceblock_ourprice', 'priceblock_dealprice', 'priceblock_saleprice']) {
           const pm = clean.match(new RegExp(`id="${pid}"[^>]*>\\s*\\$?([\\d,.]+)`));
           if (pm) { price = pm[1].replace(/,/g, ''); break; }
@@ -152,13 +158,11 @@ function auditListing(data) {
   const titleLower = title.toLowerCase();
   const bulletsText = bullets.join(' ').toLowerCase();
 
-  // CDQ: Special chars
   if (/["""\u201c\u201d\u2033]/.test(title)) {
     cdqIssues.push({ level: 'high', title: '标题含特殊字符(引号)', detail: '引号可能触发CDQ解析异常，建议替换为-Inch或删去' });
     cdqScore -= 10;
   }
 
-  // CDQ: Keyword repetition
   const wordCounts = {};
   titleLower.split(/\s+/).forEach(w => { if (w.length > 3) wordCounts[w] = (wordCounts[w] || 0) + 1; });
   const repeated = Object.entries(wordCounts).filter(([, v]) => v > 1);
@@ -167,7 +171,6 @@ function auditListing(data) {
     cdqScore -= 8;
   }
 
-  // CDQ: Voltage
   let voltage = '';
   for (const [k, v] of Object.entries(specs)) {
     if (/voltage|volt/i.test(k)) { voltage = v; break; }
@@ -180,7 +183,6 @@ function auditListing(data) {
     cdqScore -= 3;
   }
 
-  // CDQ: Wattage inconsistency
   const wattageVals = {};
   for (const [k, v] of Object.entries(specs)) {
     if (/watt|power/i.test(k)) wattageVals[k] = v;
@@ -190,7 +192,6 @@ function auditListing(data) {
     cdqScore -= 8;
   }
 
-  // CDQ: Missing attributes
   const importantAttrs = { 'Noise Level': '噪音等级', 'Certification': '认证', 'Material': '材质', 'Item Weight': '重量', 'Package Dimensions': '包装尺寸', 'Wattage': '功率' };
   const missing = Object.entries(importantAttrs).filter(([a]) => !Object.keys(specs).some(k => k.toLowerCase().includes(a.toLowerCase())));
   if (missing.length) {
@@ -198,7 +199,6 @@ function auditListing(data) {
     cdqScore -= 3 * Math.min(missing.length, 4);
   }
 
-  // CDQ: Title length
   if (title.length < 80) {
     cdqIssues.push({ level: 'low', title: `标题偏短(${title.length}字符)`, detail: '建议150-200字符' });
     cdqScore -= 3;
@@ -207,7 +207,6 @@ function auditListing(data) {
     cdqScore -= 5;
   }
 
-  // LQI checks
   if (titleLower.includes('bpa') && !bulletsText.includes('bpa')) {
     lqiIssues.push({ level: 'high', title: 'BPA Free仅标题提及', detail: '五点描述未展开' });
     lqiScore -= 12;

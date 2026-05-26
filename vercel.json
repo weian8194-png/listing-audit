@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/audit.js": {
+      "runtime": "edge"
+    }
+  },
   "rewrites": [
     { "source": "/api/audit", "destination": "/api/audit.js" }
   ]
