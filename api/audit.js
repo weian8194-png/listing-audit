@@ -4,7 +4,7 @@
 export const config = { runtime: 'edge' };
 
 const RAPIDAPI_HOST = 'real-time-amazon-data.p.rapidapi.com';
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
+const RAPIDAPI_KEY = process.env.RAPIDAPIKEY || '';
 
 function jsonRes(data, status = 200) {
   return new Response(JSON.stringify(data), {
