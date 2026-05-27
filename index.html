@@ -407,7 +407,7 @@ function renderReport(data) {
       const gClass = gradeClassMap[g] || 'grade-fair';
       const warnHtml = (opt.warnings||[]).map(w => `<div class="title-warning warn-${w.type}">${w.type==='red'?'🔴':'⚠️'} ${esc(w.text)}</div>`).join('');
       const coveredHtml = (opt.coveredKeywords||[]).map(k => `<span class="title-tag tag-covered">✓ ${esc(k)}</span>`).join('');
-      const missingHtml = (opt.missingP0||[]).map(k => `<span class="title-tag tag-missing">✗ ${esc(k)}</span>`).join('');
+      const trimmedHtml = (opt.trimmedFields||[]).map(k => `<span class="title-tag tag-missing">✗ ${esc(k)}</span>`).join('');
       const integrityIcon = opt.paramIntegrity !== false ? '' : ' 🔴参数异常';
       const lenStatus = opt.charCount < 100 ? '🔴 过短' : opt.charCount < 140 ? '🟡 偏短' : opt.charCount > 200 ? '🟡 偏长' : '✅ 合适';
       const changesHtml = (opt.changes||[]).map(c => `<div style="font-size:0.78rem;color:#8b949e;padding:2px 0">→ ${esc(c)}</div>`).join('');
@@ -423,7 +423,7 @@ function renderReport(data) {
           <span class="title-option-chars">${opt.charCount} 字符 ${lenStatus}</span>
           <button class="copy-btn" onclick="copyText(document.getElementById('titleOpt${i}').textContent,this)">📋 一键复制</button>
         </div>
-        <div class="title-tags">${coveredHtml}${missingHtml}</div>
+        <div class="title-tags">${coveredHtml}${trimmedHtml}</div>
         ${changesHtml?'<div style="margin-top:6px;padding-top:6px;border-top:1px solid #21262d"><div style="font-size:0.75rem;font-weight:700;color:#58a6ff;margin-bottom:4px">📝 调整说明</div>'+changesHtml+'</div>':''}
         ${warnHtml}
       </div>`;
@@ -491,7 +491,7 @@ function exportCSV() {
     csv += `Issue ${i+1},${iss.level},"${iss.title.replace(/"/g,'""')}","${iss.fix.replace(/"/g,'""')}",-${iss.deduction}\n`;
   });
   a.title_options.forEach(opt => {
-    csv += `Title Option,${opt.label},"${opt.title.replace(/"/g,'""')}",${opt.charCount} chars,${opt.qualityGrade||'N/A'},Covered:${(opt.coveredKeywords||[]).join(';')},Missing:${(opt.missingP0||[]).join(';')},Changes:${(opt.changes||[]).join('; ')}` + '\n';
+    csv += `Title Option,${opt.label},"${opt.title.replace(/"/g,'""')}",${opt.charCount} chars,${opt.qualityGrade||'N/A'},Covered:${(opt.coveredKeywords||[]).join(';')},Trimmed:${(opt.trimmedFields||[]).join(';')},Changes:${(opt.changes||[]).join('; ')}` + '\n';
   });
 
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
@@ -519,7 +519,7 @@ function exportMD() {
     md += `### ${opt.label} (${opt.charCount}字符, ${opt.qualityGrade||'N/A'})\n${opt.title}\n\n`;
     if (opt.changes && opt.changes.length) md += `调整说明:\n${opt.changes.map(c => '- ' + c).join('\n')}\n\n`;
     if (opt.coveredKeywords && opt.coveredKeywords.length) md += `已覆盖: ${opt.coveredKeywords.join(', ')}\n\n`;
-    if (opt.missingP0 && opt.missingP0.length) md += `⚠️ 缺失P0: ${opt.missingP0.join(', ')}\n\n`;
+    if (opt.trimmedFields && opt.trimmedFields.length) md += `✂️ 因长度裁剪: ${opt.trimmedFields.join(', ')}\n\n`;
     if (opt.warnings && opt.warnings.length) md += opt.warnings.map(w => `> ${w.text}`).join('\n') + '\n\n';
   });
   md += `\n## 五点描述优化\n`;
