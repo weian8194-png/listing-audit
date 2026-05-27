@@ -115,13 +115,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .issue-fix::before{content:'🔧 修复：';font-weight:700}
 .issue-deduction{font-size:0.75rem;color:#e94560;float:right}
 
-/* Title options */
-.title-option{background:#0d1117;border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid #30363d}
-.title-option-label{font-size:0.8rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px}
-.title-option-desc{font-size:0.75rem;color:#8b949e;margin-bottom:8px}
-.title-option-text{font-size:0.88rem;color:#e6edf3;line-height:1.5;padding:10px;background:#161b22;border-radius:6px;border:1px solid #30363d}
-.title-option-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-.title-option-chars{font-size:0.75rem;color:#8b949e}
+/* Title options v3 */
+.title-option{background:#0d1117;border-radius:10px;padding:18px;margin-bottom:14px;border:1px solid #30363d;transition:border-color 0.2s}
+.title-option:hover{border-color:#484f58}
+.title-option-label{font-size:0.85rem;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+.title-option-desc{font-size:0.75rem;color:#8b949e;margin-bottom:10px}
+.title-option-text{font-size:0.88rem;color:#e6edf3;line-height:1.6;padding:12px;background:#161b22;border-radius:6px;border:1px solid #30363d;word-break:break-word}
+.title-option-meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.title-option-chars{font-size:0.78rem;color:#8b949e;font-weight:600}
+.title-quality-grade{display:inline-block;padding:2px 10px;border-radius:10px;font-size:0.72rem;font-weight:700}
+.grade-optimized{background:rgba(22,199,154,0.15);color:#16c79a}
+.grade-great{background:rgba(74,222,128,0.15);color:#4ade80}
+.grade-good{background:rgba(255,153,0,0.15);color:#FF9900}
+.grade-fair{background:rgba(245,158,11,0.15);color:#f59e0b}
+.grade-poor{background:rgba(233,69,96,0.15);color:#e94560}
+.title-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.title-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:500}
+.tag-covered{background:rgba(22,199,154,0.12);color:#16c79a;border:1px solid rgba(22,199,154,0.2)}
+.tag-missing{background:rgba(233,69,96,0.12);color:#e94560;border:1px solid rgba(233,69,96,0.2)}
+.title-warning{margin-top:8px;padding:8px 12px;border-radius:6px;font-size:0.78rem;line-height:1.5}
+.warn-yellow{background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;color:#f59e0b}
+.warn-red{background:rgba(233,69,96,0.1);border-left:3px solid #e94560;color:#e94560}
+.warn-info{background:rgba(88,166,255,0.08);border-left:3px solid #58a6ff;color:#8b949e}
 .copy-btn{padding:4px 12px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-size:0.75rem;cursor:pointer}
 .copy-btn:hover{background:#30363d}
 
@@ -383,17 +398,32 @@ function renderReport(data) {
       <div class="issue-fix">${esc(iss.fix)}</div>
     </div>`).join('')}</div>`;
 
-  // Title options
+  // Title options v3 - with quality grade, keywords, warnings
+  const gradeClassMap = {Optimized:'grade-optimized',Great:'grade-great',Good:'grade-good',Fair:'grade-fair',Poor:'grade-poor'};
   html += `<div class="section"><h2 class="section-title">✏️ 标题优化（${a.title_options.length}个候选方案）</h2>
-    <div style="margin-bottom:12px;color:#8b949e;font-size:0.85rem"><strong>原始标题：</strong>${esc(data.title||'N/A')}</div>
-    ${a.title_options.map((opt,i) => `<div class="title-option">
-      <div class="title-option-label"><span style="color:${i===2?'#16c79a':'#58a6ff'}">${i===2?'⭐ ':''}${opt.label}</span></div>
-      <div class="title-option-desc">${opt.desc}</div>
-      <div class="title-option-text" id="titleOpt${i}">${esc(opt.title)}</div>
-      <div class="title-option-meta">
-        <span class="title-option-chars">${opt.charCount} 字符 ${opt.charCount>=150&&opt.charCount<=200?'✅':'⚠️'}</span>
-        <button class="copy-btn" onclick="copyText(document.getElementById('titleOpt${i}').textContent,this)">📋 复制</button>
-      </div></div>`).join('')}</div>`;
+    <div style="margin-bottom:14px;color:#8b949e;font-size:0.85rem"><strong>原始标题：</strong>${esc(data.title||'N/A')}</div>
+    ${a.title_options.map((opt,i) => {
+      const g = opt.qualityGrade || 'Fair';
+      const gClass = gradeClassMap[g] || 'grade-fair';
+      const warnHtml = (opt.warnings||[]).map(w => `<div class="title-warning warn-${w.type}">${w.type==='red'?'🔴':'⚠️'} ${esc(w.text)}</div>`).join('');
+      const coveredHtml = (opt.coveredKeywords||[]).map(k => `<span class="title-tag tag-covered">✓ ${esc(k)}</span>`).join('');
+      const missingHtml = (opt.missingP0||[]).map(k => `<span class="title-tag tag-missing">✗ ${esc(k)}</span>`).join('');
+      const lenStatus = opt.charCount < 100 ? '🔴 过短' : opt.charCount < 140 ? '🟡 偏短' : opt.charCount > 200 ? '🟡 偏长' : '✅ 合适';
+      return `<div class="title-option">
+        <div class="title-option-label">
+          <span style="color:${i===2?'#16c79a':'#58a6ff'}">${i===2?'⭐ ':''}${esc(opt.label)}</span>
+          <span class="title-quality-grade ${gClass}">${g}</span>
+        </div>
+        <div class="title-option-desc">${esc(opt.desc)}</div>
+        <div class="title-option-text" id="titleOpt${i}">${esc(opt.title)}</div>
+        <div class="title-option-meta">
+          <span class="title-option-chars">${opt.charCount} 字符 ${lenStatus}</span>
+          <button class="copy-btn" onclick="copyText(document.getElementById('titleOpt${i}').textContent,this)">📋 一键复制</button>
+        </div>
+        <div class="title-tags">${coveredHtml}${missingHtml}</div>
+        ${warnHtml}
+      </div>`;
+    }).join('')}</div>`;
 
   // Bullet Before/After
   if (a.bullet_rewrites && a.bullet_rewrites.length > 0) {
@@ -457,7 +487,7 @@ function exportCSV() {
     csv += `Issue ${i+1},${iss.level},"${iss.title.replace(/"/g,'""')}","${iss.fix.replace(/"/g,'""')}",-${iss.deduction}\n`;
   });
   a.title_options.forEach(opt => {
-    csv += `Title Option,${opt.label},"${opt.title.replace(/"/g,'""')}",${opt.charCount} chars\n`;
+    csv += `Title Option,${opt.label},"${opt.title.replace(/"/g,'""')}",${opt.charCount} chars,${opt.qualityGrade||'N/A'},Covered:${(opt.coveredKeywords||[]).join(';')},Missing:${(opt.missingP0||[]).join(';')}\n`;
   });
 
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
@@ -481,7 +511,12 @@ function exportMD() {
   md += `\n## 问题清单(${a.all_issues.length}项)\n| 优先级 | 问题 | 修复建议 | 扣分 |\n|--------|------|----------|------|\n`;
   a.all_issues.forEach(iss => { md += `| ${iss.level} | ${iss.title} | ${iss.fix} | -${iss.deduction} |\n`; });
   md += `\n## 标题优化\n`;
-  a.title_options.forEach(opt => { md += `### ${opt.label} (${opt.charCount}字符)\n${opt.title}\n\n`; });
+  a.title_options.forEach(opt => {
+    md += `### ${opt.label} (${opt.charCount}字符, ${opt.qualityGrade||'N/A'})\n${opt.title}\n\n`;
+    if (opt.coveredKeywords && opt.coveredKeywords.length) md += `已覆盖: ${opt.coveredKeywords.join(', ')}\n\n`;
+    if (opt.missingP0 && opt.missingP0.length) md += `⚠️ 缺失P0: ${opt.missingP0.join(', ')}\n\n`;
+    if (opt.warnings && opt.warnings.length) md += opt.warnings.map(w => `> ${w.text}`).join('\n') + '\n\n';
+  });
   md += `\n## 五点描述优化\n`;
   a.bullet_rewrites.forEach(br => {
     if (br.hasChange) { md += `### 第${br.index}条\n**Before**: ${br.before}\n\n**After**: ${br.after}\n\n`; }
