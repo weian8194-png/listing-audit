@@ -1,9 +1,9 @@
-// Listing CDQ/LQI Audit API - Uses RapidAPI Amazon Data API
+// Listing CDQ/LQI Audit API - Uses RapidAPI Real-Time Amazon Data API
 // No more direct scraping = no more CAPTCHA/timeout issues
 
 export const config = { runtime: 'edge' };
 
-const RAPIDAPI_HOST = 'real-time-amazon-data-the-most-complete.p.rapidapi.com';
+const RAPIDAPI_HOST = 'real-time-amazon-data.p.rapidapi.com';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 
 function jsonRes(data, status = 200) {
@@ -35,9 +35,14 @@ async function fetchAmazonData(asin) {
     }
 
     const json = await resp.json();
+
+    if (json.message && json.message.includes('not subscribed')) {
+      return { error: 'RapidAPI subscription required. Please subscribe to Real-Time Amazon Data API (free tier available).', asin };
+    }
+
     const product = json.data;
 
-    if (!product) {
+    if (!product || !product.product_title) {
       return { error: 'No product data returned. ASIN may be invalid or product unavailable.', asin };
     }
 
@@ -46,8 +51,9 @@ async function fetchAmazonData(asin) {
       asin,
       url: `https://www.amazon.com/dp/${asin}`,
       title: product.product_title || 'N/A',
-      brand: product.product_byline || 'N/A',
+      brand: (product.product_byline || 'N/A').replace('Visit the ', '').replace(' Store', ''),
       price: 'N/A',
+      original_price: '',
       rating: product.product_star_rating?.toString() || 'N/A',
       review_count: product.product_num_ratings?.toString() || 'N/A',
       bullets: [],
@@ -57,28 +63,40 @@ async function fetchAmazonData(asin) {
       has_aplus: false,
       bsr_rank: 'N/A',
       bsr_category: 'N/A',
+      deal_type: 'none',
+      is_amazon_choice: product.is_amazon_choice || false,
+      is_best_seller: product.is_best_seller || false,
+      availability: product.product_availability || '',
+      sales_volume: product.sales_volume || '',
     };
 
-    // Price - try multiple fields
+    // Price
     if (product.product_price) {
       data.price = String(product.product_price).replace(/[^0-9.]/g, '');
-    } else if (product.product_original_price) {
-      data.price = String(product.product_original_price).replace(/[^0-9.]/g, '');
+    }
+    if (product.product_original_price) {
+      data.original_price = String(product.product_original_price).replace(/[^0-9.]/g, '');
     }
 
-    // Bullets (feature_bullets)
-    if (Array.isArray(product.feature_bullets)) {
-      data.bullets = product.feature_bullets.filter(b => b && b.trim().length > 10).slice(0, 5);
+    // Deal type detection
+    if (product.deal_badge === 'Limited time deal') {
+      data.deal_type = 'BD';
+    } else if (product.about_product && product.about_product.length > 0) {
+      // Check for coupon in about_product or other signals
+      data.deal_type = 'none';
+    }
+
+    // Bullets (about_product)
+    if (Array.isArray(product.about_product)) {
+      data.bullets = product.about_product.filter(b => b && b.trim().length > 10).slice(0, 5);
     }
     if (data.bullets.length === 0) {
       data.bullets = ['Failed to extract bullets'];
     }
 
-    // Tech specs (product_details)
-    if (product.product_details && typeof product.product_details === 'object') {
-      const details = product.product_details;
-      // API returns specs as key-value pairs
-      for (const [k, v] of Object.entries(details)) {
+    // Tech specs (product_information)
+    if (product.product_information && typeof product.product_information === 'object') {
+      for (const [k, v] of Object.entries(product.product_information)) {
         if (typeof v === 'string' || typeof v === 'number') {
           data.tech_specs[k] = String(v);
         }
@@ -88,44 +106,21 @@ async function fetchAmazonData(asin) {
     // Images
     if (Array.isArray(product.product_photos)) {
       data.images_count = product.product_photos.length;
-    } else if (product.product_photos) {
-      data.images_count = Math.max(1, Object.keys(product.product_photos).length);
     }
 
     // Video
-    data.has_video = !!(product.product_video || product.videos);
+    data.has_video = Array.isArray(product.product_videos) && product.product_videos.length > 0;
 
-    // A+ (check if aplus_content exists)
-    data.has_aplus = !!(product.aplus_content || product.product_description?.length > 500);
+    // A+
+    data.has_aplus = !!product.has_aplus;
 
     // BSR
-    if (product.bestseller_rank) {
-      const bsrStr = String(product.bestseller_rank);
-      const bsrMatch = bsrStr.match(/#?([\d,]+)/);
+    if (data.tech_specs['Best Sellers Rank']) {
+      const bsrStr = data.tech_specs['Best Sellers Rank'];
+      const bsrMatch = bsrStr.match(/#([\d,]+)/);
       if (bsrMatch) data.bsr_rank = bsrMatch[1].replace(/,/g, '');
-      // Try to extract category
-      const catMatch = bsrStr.match(/in\s+(.+?)(?:\s*\(|$)/i);
+      const catMatch = bsrStr.match(/in\s+([^((]+)/);
       if (catMatch) data.bsr_category = catMatch[1].trim();
-    }
-
-    // Deal type detection from API data
-    data.deal_type = 'none';
-    data.deal_price = null;
-
-    if (product.product_offer === 'deal' || product.deal_badge) {
-      data.deal_type = 'BD';
-      if (product.product_price && product.product_original_price) {
-        data.deal_price = String(product.product_price).replace(/[^0-9.]/g, '');
-      }
-    }
-
-    // Coupon detection
-    if (product.coupon_text) {
-      const couponMatch = String(product.coupon_text).match(/\$(\d+)/);
-      if (couponMatch) {
-        data.deal_type = data.deal_type === 'BD' ? 'BD' : 'coupon';
-        data.coupon_amount = couponMatch[1];
-      }
     }
 
     return data;
@@ -150,13 +145,15 @@ function auditListing(data) {
   const titleLower = title.toLowerCase();
   const bulletsText = bullets.join(' ').toLowerCase();
 
-  // CDQ checks
+  // === CDQ Checks ===
 
+  // Special characters in title (quotes, inches symbols)
   if (/["""\u201c\u201d\u2033]/.test(title)) {
-    cdqIssues.push({ level: 'high', title: '标题含特殊字符(引号)', detail: '引号可能触发CDQ解析异常，建议替换为-Inch或删去' });
+    cdqIssues.push({ level: 'high', title: '标题含特殊字符(引号/英寸符号)', detail: '引号可能触发CDQ解析异常，建议替换为-Inch或删去' });
     cdqScore -= 10;
   }
 
+  // Keyword repetition in title
   const wordCounts = {};
   titleLower.split(/\s+/).forEach(w => { if (w.length > 3) wordCounts[w] = (wordCounts[w] || 0) + 1; });
   const repeated = Object.entries(wordCounts).filter(([, v]) => v > 1);
@@ -165,6 +162,7 @@ function auditListing(data) {
     cdqScore -= 8;
   }
 
+  // Voltage check (critical for US market)
   let voltage = '';
   for (const [k, v] of Object.entries(specs)) {
     if (/voltage|volt/i.test(k)) { voltage = v; break; }
@@ -177,6 +175,7 @@ function auditListing(data) {
     cdqScore -= 3;
   }
 
+  // Wattage inconsistency
   const wattageVals = {};
   for (const [k, v] of Object.entries(specs)) {
     if (/watt|power/i.test(k)) wattageVals[k] = v;
@@ -186,6 +185,7 @@ function auditListing(data) {
     cdqScore -= 8;
   }
 
+  // Missing important attributes
   const importantAttrs = { 'Noise Level': '噪音等级', 'Certification': '认证', 'Material': '材质', 'Item Weight': '重量', 'Package Dimensions': '包装尺寸', 'Wattage': '功率' };
   const missing = Object.entries(importantAttrs).filter(([a]) => !Object.keys(specs).some(k => k.toLowerCase().includes(a.toLowerCase())));
   if (missing.length) {
@@ -193,6 +193,7 @@ function auditListing(data) {
     cdqScore -= 3 * Math.min(missing.length, 4);
   }
 
+  // Title length
   if (title.length < 80) {
     cdqIssues.push({ level: 'low', title: `标题偏短(${title.length}字符)`, detail: '建议150-200字符' });
     cdqScore -= 3;
@@ -201,13 +202,15 @@ function auditListing(data) {
     cdqScore -= 5;
   }
 
-  // LQI checks
+  // === LQI Checks ===
 
+  // BPA Free only in title, not in bullets
   if (titleLower.includes('bpa') && !bulletsText.includes('bpa')) {
     lqiIssues.push({ level: 'high', title: 'BPA Free仅标题提及', detail: '五点描述未展开' });
     lqiScore -= 12;
   }
 
+  // Last bullet is brand fluff
   if (bullets.length >= 5) {
     const last = bullets[bullets.length - 1].toLowerCase();
     if (['promise', 'quality', 'guarantee', 'deserve', 'mission', 'committed'].some(w => last.includes(w))) {
@@ -216,6 +219,7 @@ function auditListing(data) {
     }
   }
 
+  // Images count
   if (imagesCount < 7) {
     lqiIssues.push({ level: 'high', title: `图片不足(${imagesCount}张)`, detail: '建议9张以上' });
     lqiScore -= 12;
@@ -224,22 +228,26 @@ function auditListing(data) {
     lqiScore -= 5;
   }
 
+  // Video
   if (!hasVideo) {
     lqiIssues.push({ level: 'medium', title: '缺少产品视频', detail: '视频提升转化率20%+' });
     lqiScore -= 8;
   }
 
+  // A+ page
   if (!hasAplus) {
     lqiIssues.push({ level: 'medium', title: '缺少A+页面', detail: 'A+提升转化3-10%' });
     lqiScore -= 8;
   }
 
+  // Differentiation language
   const diffWords = ['wider', 'larger', 'unique', 'only', 'first', 'exclusive', 'unlike', 'compared'];
   if (!diffWords.some(w => bulletsText.includes(w))) {
     lqiIssues.push({ level: 'medium', title: '卖点缺乏竞品对比', detail: '消费者无法感知差异化' });
     lqiScore -= 6;
   }
 
+  // Unsupported data claims
   const pctMatch = bulletsText.match(/([\d.]+%)\s*(?:juice|yield|extract)/);
   if (pctMatch && !['test', 'lab', 'certif', 'verif'].some(w => bulletsText.includes(w))) {
     lqiIssues.push({ level: 'low', title: '数据声明缺乏支撑', detail: `"${pctMatch[1]}"无第三方认证` });
