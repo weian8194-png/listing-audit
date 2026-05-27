@@ -1,13 +1,10 @@
-// Listing CDQ/LQI Audit API - Edge Runtime (30s timeout, different IP pool)
+// Listing CDQ/LQI Audit API - Uses RapidAPI Amazon Data API
+// No more direct scraping = no more CAPTCHA/timeout issues
+
 export const config = { runtime: 'edge' };
 
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Cookie': 'lc-main=en_US',
-};
+const RAPIDAPI_HOST = 'real-time-amazon-data-the-most-complete.p.rapidapi.com';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 
 function jsonRes(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -16,129 +13,124 @@ function jsonRes(data, status = 200) {
   });
 }
 
-async function fetchAmazon(asin) {
-  const url = `https://www.amazon.com/dp/${asin}`;
+async function fetchAmazonData(asin) {
+  if (!RAPIDAPI_KEY) {
+    return { error: 'API key not configured. Please set RAPIDAPI_KEY environment variable in Vercel.', asin };
+  }
+
+  const url = `https://${RAPIDAPI_HOST}/product-details?asin=${asin}&country=US`;
+
   try {
     const resp = await fetch(url, {
-      headers: HEADERS,
-      redirect: 'follow',
-      signal: AbortSignal.timeout(20000),
+      headers: {
+        'x-rapidapi-host': RAPIDAPI_HOST,
+        'x-rapidapi-key': RAPIDAPI_KEY,
+      },
+      signal: AbortSignal.timeout(25000),
     });
-    if (!resp.ok) return { error: `Amazon returned status ${resp.status}. Amazon may be blocking serverless requests.`, asin, url };
 
-    const html = await resp.text();
-
-    // Check if Amazon returned a CAPTCHA or bot detection page
-    if (html.includes('api-services-support@amazon.com') || html.includes('Robot Check') || html.includes('Type the characters')) {
-      return { error: 'Amazon returned a CAPTCHA/bot detection page. Please try again later or use a different network.', asin, url };
+    if (!resp.ok) {
+      const body = await resp.text();
+      return { error: `API returned ${resp.status}: ${body.slice(0, 200)}`, asin };
     }
 
-    // Clean script/style
-    let clean = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    clean = clean.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    const json = await resp.json();
+    const product = json.data;
 
-    const data = { asin, url };
-
-    // Title
-    const titleMatch = clean.match(/id="productTitle"[^>]*>\s*([\s\S]*?)\s*<\/span>/);
-    data.title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : 'N/A';
-
-    // Brand
-    const brandMatch = clean.match(/id="bylineInfo"[^>]*>\s*([\s\S]*?)\s*<\/(?:a|span|div)/);
-    if (brandMatch) {
-      data.brand = brandMatch[1].replace(/<[^>]+>/g, '').trim()
-        .replace('Visit the ', '').replace(' Store', '').replace('Brand: ', '');
-    } else {
-      data.brand = 'N/A';
+    if (!product) {
+      return { error: 'No product data returned. ASIN may be invalid or product unavailable.', asin };
     }
 
-    // Price
-    let price = 'N/A';
-    const pwMatch = clean.match(/class="a-price-whole"[^>]*>\s*\$?([\d,.]+)/);
-    const pfMatch = clean.match(/class="a-price-fraction"[^>]*>\s*(\d+)/);
-    if (pwMatch) {
-      price = pwMatch[1].replace(/,/g, '').replace(/\.$/, '') + '.' + (pfMatch ? pfMatch[1] : '00');
-    } else {
-      const offMatch = clean.match(/class="a-offscreen"[^>]*>\s*\$?([\d,.]+)/);
-      if (offMatch) price = offMatch[1].replace(/,/g, '');
-      else {
-        for (const pid of ['priceblock_ourprice', 'priceblock_dealprice', 'priceblock_saleprice']) {
-          const pm = clean.match(new RegExp(`id="${pid}"[^>]*>\\s*\\$?([\\d,.]+)`));
-          if (pm) { price = pm[1].replace(/,/g, ''); break; }
+    // Map API response to our data structure
+    const data = {
+      asin,
+      url: `https://www.amazon.com/dp/${asin}`,
+      title: product.product_title || 'N/A',
+      brand: product.product_byline || 'N/A',
+      price: 'N/A',
+      rating: product.product_star_rating?.toString() || 'N/A',
+      review_count: product.product_num_ratings?.toString() || 'N/A',
+      bullets: [],
+      tech_specs: {},
+      images_count: 0,
+      has_video: false,
+      has_aplus: false,
+      bsr_rank: 'N/A',
+      bsr_category: 'N/A',
+    };
+
+    // Price - try multiple fields
+    if (product.product_price) {
+      data.price = String(product.product_price).replace(/[^0-9.]/g, '');
+    } else if (product.product_original_price) {
+      data.price = String(product.product_original_price).replace(/[^0-9.]/g, '');
+    }
+
+    // Bullets (feature_bullets)
+    if (Array.isArray(product.feature_bullets)) {
+      data.bullets = product.feature_bullets.filter(b => b && b.trim().length > 10).slice(0, 5);
+    }
+    if (data.bullets.length === 0) {
+      data.bullets = ['Failed to extract bullets'];
+    }
+
+    // Tech specs (product_details)
+    if (product.product_details && typeof product.product_details === 'object') {
+      const details = product.product_details;
+      // API returns specs as key-value pairs
+      for (const [k, v] of Object.entries(details)) {
+        if (typeof v === 'string' || typeof v === 'number') {
+          data.tech_specs[k] = String(v);
         }
       }
     }
-    data.price = price;
-
-    // Rating
-    const ratingMatch = html.match(/([\d.]+)\s*out\s*of\s*5/);
-    data.rating = ratingMatch ? ratingMatch[1] : 'N/A';
-
-    // Review count
-    const reviewMatch = html.match(/id="acrCustomerReviewText"[^>]*>\s*([\d,]+)/);
-    data.review_count = reviewMatch ? reviewMatch[1].replace(/,/g, '') : 'N/A';
-
-    // Bullets
-    const bullets = [];
-    const bulletSection = clean.match(/id="feature-bullets"[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/);
-    if (bulletSection) {
-      const items = bulletSection[1].match(/<span class="a-list-item">\s*([\s\S]*?)\s*<\/span>/g);
-      if (items) {
-        for (const item of items) {
-          const text = item.replace(/<[^>]+>/g, '').trim();
-          if (text && !text.includes('Make sure this fits') && text.length > 10) {
-            bullets.push(text);
-          }
-        }
-      }
-    }
-    data.bullets = bullets.slice(0, 5).length ? bullets.slice(0, 5) : ['Failed to extract bullets'];
-
-    // Tech specs
-    const specs = {};
-    for (const tableId of ['prodDetTable', 'productDetails_techSpec_section_1']) {
-      const tableMatch = html.match(new RegExp(`id="${tableId}"[\\s\\S]*?<tbody>([\\s\\S]*?)<\\/tbody>`));
-      if (tableMatch) {
-        const rows = tableMatch[1].match(/<tr[^>]*>[\s\S]*?<\/tr>/g);
-        if (rows) {
-          for (const row of rows) {
-            const thMatch = row.match(/<th[^>]*>([\s\S]*?)<\/th>/);
-            const tdMatch = row.match(/<td[^>]*>([\s\S]*?)<\/td>/);
-            if (thMatch && tdMatch) {
-              const k = thMatch[1].replace(/<[^>]+>/g, '').trim();
-              const v = tdMatch[1].replace(/<[^>]+>/g, '').trim();
-              if (k && v) specs[k] = v;
-            }
-          }
-        }
-        break;
-      }
-    }
-    data.tech_specs = specs;
 
     // Images
-    const imgCount = (html.match(/data-a-dynamic-image="/g) || []).length || (html.match(/altImageCard/g) || []).length;
-    data.images_count = Math.max(imgCount, 1);
+    if (Array.isArray(product.product_photos)) {
+      data.images_count = product.product_photos.length;
+    } else if (product.product_photos) {
+      data.images_count = Math.max(1, Object.keys(product.product_photos).length);
+    }
 
     // Video
-    data.has_video = /video|(?:ivm|vp)\./i.test(html);
+    data.has_video = !!(product.product_video || product.videos);
 
-    // A+
-    data.has_aplus = /aplus/.test(html);
+    // A+ (check if aplus_content exists)
+    data.has_aplus = !!(product.aplus_content || product.product_description?.length > 500);
 
     // BSR
-    const bsrMatch = clean.match(/#([\d,]+)\s+in\s+([^(<\n]+)/);
-    if (bsrMatch) {
-      data.bsr_rank = bsrMatch[1].replace(/,/g, '');
-      data.bsr_category = bsrMatch[2].trim();
-    } else {
-      data.bsr_rank = 'N/A';
-      data.bsr_category = 'N/A';
+    if (product.bestseller_rank) {
+      const bsrStr = String(product.bestseller_rank);
+      const bsrMatch = bsrStr.match(/#?([\d,]+)/);
+      if (bsrMatch) data.bsr_rank = bsrMatch[1].replace(/,/g, '');
+      // Try to extract category
+      const catMatch = bsrStr.match(/in\s+(.+?)(?:\s*\(|$)/i);
+      if (catMatch) data.bsr_category = catMatch[1].trim();
+    }
+
+    // Deal type detection from API data
+    data.deal_type = 'none';
+    data.deal_price = null;
+
+    if (product.product_offer === 'deal' || product.deal_badge) {
+      data.deal_type = 'BD';
+      if (product.product_price && product.product_original_price) {
+        data.deal_price = String(product.product_price).replace(/[^0-9.]/g, '');
+      }
+    }
+
+    // Coupon detection
+    if (product.coupon_text) {
+      const couponMatch = String(product.coupon_text).match(/\$(\d+)/);
+      if (couponMatch) {
+        data.deal_type = data.deal_type === 'BD' ? 'BD' : 'coupon';
+        data.coupon_amount = couponMatch[1];
+      }
     }
 
     return data;
   } catch (err) {
-    return { error: `Fetch failed: ${err.message}`, asin, url };
+    return { error: `Fetch failed: ${err.message}`, asin };
   }
 }
 
@@ -157,6 +149,8 @@ function auditListing(data) {
 
   const titleLower = title.toLowerCase();
   const bulletsText = bullets.join(' ').toLowerCase();
+
+  // CDQ checks
 
   if (/["""\u201c\u201d\u2033]/.test(title)) {
     cdqIssues.push({ level: 'high', title: '标题含特殊字符(引号)', detail: '引号可能触发CDQ解析异常，建议替换为-Inch或删去' });
@@ -206,6 +200,8 @@ function auditListing(data) {
     cdqIssues.push({ level: 'medium', title: `标题过长(${title.length}字符)`, detail: '超200字符会被截断' });
     cdqScore -= 5;
   }
+
+  // LQI checks
 
   if (titleLower.includes('bpa') && !bulletsText.includes('bpa')) {
     lqiIssues.push({ level: 'high', title: 'BPA Free仅标题提及', detail: '五点描述未展开' });
@@ -293,7 +289,7 @@ export default async function handler(req) {
       return jsonRes({ error: 'Please enter a valid 10-character ASIN' }, 400);
     }
 
-    const data = await fetchAmazon(asin);
+    const data = await fetchAmazonData(asin);
 
     if (data.error) {
       return jsonRes(data);
