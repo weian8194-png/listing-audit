@@ -408,11 +408,13 @@ function renderReport(data) {
       const warnHtml = (opt.warnings||[]).map(w => `<div class="title-warning warn-${w.type}">${w.type==='red'?'🔴':'⚠️'} ${esc(w.text)}</div>`).join('');
       const coveredHtml = (opt.coveredKeywords||[]).map(k => `<span class="title-tag tag-covered">✓ ${esc(k)}</span>`).join('');
       const missingHtml = (opt.missingP0||[]).map(k => `<span class="title-tag tag-missing">✗ ${esc(k)}</span>`).join('');
+      const integrityIcon = opt.paramIntegrity !== false ? '' : ' 🔴参数异常';
       const lenStatus = opt.charCount < 100 ? '🔴 过短' : opt.charCount < 140 ? '🟡 偏短' : opt.charCount > 200 ? '🟡 偏长' : '✅ 合适';
-      return `<div class="title-option">
+      return `<div class="title-option" style="${opt.paramIntegrity===false?'border-color:#e94560':''}">
         <div class="title-option-label">
           <span style="color:${i===2?'#16c79a':'#58a6ff'}">${i===2?'⭐ ':''}${esc(opt.label)}</span>
           <span class="title-quality-grade ${gClass}">${g}</span>
+          ${integrityIcon?'<span style="color:#e94560;font-size:0.75rem;font-weight:700">'+integrityIcon+'</span>':''}
         </div>
         <div class="title-option-desc">${esc(opt.desc)}</div>
         <div class="title-option-text" id="titleOpt${i}">${esc(opt.title)}</div>

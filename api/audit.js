@@ -1,4 +1,5 @@
-// Listing CDQ/LQI Audit API v3 - Category-Aware Title Optimization Engine
+// Listing CDQ/LQI Audit API v4 - Field-Lock Title Optimization Engine
+// Core principle: Extract → Classify → Lock → Reassemble (NEVER summarize/delete)
 // Uses RapidAPI Real-Time Amazon Data API
 
 export const config = { runtime: 'edge' };
@@ -240,7 +241,7 @@ function auditListing(data) {
     if (['promise', 'quality', 'guarantee', 'deserve', 'mission', 'committed'].some(w => last.includes(w))) {
       addIssue(lqiContentQuality, 8, 'high', '第五条五点为品牌套话',
       '第五条是转化黄金位，品牌套话浪费了最后说服买家的机会',
-      '替换为实际卖点(清洁方式/配件/保修)，如: "Easy Cleanup & Complete Package: Detachable parts rinse clean in 60 seconds. Includes 2 cups, cleaning brush, and recipe booklet"');
+      '替换为实际卖点(清洁方式/配件/保修)');
     }
   }
 
@@ -254,7 +255,7 @@ function auditListing(data) {
   // ===== LQI: Media Coverage =====
   if (imagesCount < 7) {
     addIssue(lqiMediaCoverage, 10, 'high', `图片严重不足(仅${imagesCount}张)`,
-      '7张以下图片转化率显著偏低，竞品通常9-15张，缺少场景图/细节图/尺寸对比图',
+      '7张以下图片转化率显著偏低，竞品通常9-15张',
       '补充至9张以上: 1主图+2场景图+2细节图+1尺寸图+1配件图+1对比图');
   } else if (imagesCount < 9) {
     addIssue(lqiMediaCoverage, 5, 'medium', `图片可补充(${imagesCount}张)`,
@@ -302,10 +303,7 @@ function auditListing(data) {
   else if (overall >= 40) grade = 'Fair';
   else grade = 'Poor';
 
-  // ===== TITLE OPTIMIZATION =====
   const titleOpts = generateTitleOptions(title, data.brand, specs, bulletsText);
-
-  // ===== BULLET REWRITING =====
   const bulletRewrites = rewriteBullets(bullets, titleLower, specs);
 
   const allIssues = [
@@ -333,422 +331,437 @@ function auditListing(data) {
   };
 }
 
-// ========== TITLE OPTIMIZATION ENGINE v3 ==========
-// 核心原则：字段保留优先，重组而非删减，类目感知关键词优先级
+// ========================================================================
+// TITLE OPTIMIZATION ENGINE v4 — FIELD-LOCK + REASSEMBLE
+// Principle: Extract ALL fields → Classify P0/P1/P2 → Lock P0 → Reassemble
+// NEVER summarize. NEVER drop P0. NEVER change numbers.
+// ========================================================================
+
 function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
   const titleLower = originalTitle.toLowerCase();
   const brandClean = (brand || '').replace('Visit the ', '').replace(' Store', '').trim();
   const specEntries = Object.entries(specs || {});
 
-  // ===== 1. CATEGORY DETECTION =====
+  // ===== PHASE 1: EXTRACT ALL FIELDS FROM TITLE (never from specs for numbers) =====
+  const fields = { brand: brandClean, productTypes: [], numericSpecs: [], features: [], certifications: [], useCases: [], color: '', capacity: '', modifiers: [], outputRate: '' };
+
+  // --- Color ---
+  for (const [k, v] of specEntries) { if (/^color$/i.test(k.trim())) { fields.color = String(v).trim(); break; } }
+  if (!fields.color) {
+    const cParen = originalTitle.match(/\(([A-Za-z\s]+?)\)\s*$/);
+    if (cParen && cParen[1].length < 25) fields.color = cParen[1].trim();
+  }
+
+  // --- Product Types: collect ALL matching types, order by specificity ---
+  const typePatterns = [
+    /Snow\s+Cone\s+Machine/i, /Shaved\s+Ice\s+Machine/i, /Electric\s+Ice\s+Shaver/i, /Snow\s+Cone\s+Maker/i,
+    /Espresso\s+Coffee\s+Maker/i, /Espresso\s+Machine/i, /Coffee\s+Maker/i,
+    /Cold\s+Press\s+Juicer/i, /Slow\s+Masticating\s+Juicer/i, /Masticating\s+Juicer/i, /Juicer\s+Machine/i, /Juicer/i, /Juice\s+Extractor/i,
+    /Air\s+Fryer/i, /Deep\s+Fryer/i,
+    /Blender/i, /Food\s+Processor/i,
+    /Stand\s+Mixer/i, /Hand\s+Mixer/i, /Mixer/i,
+    /Ice\s+Cream\s+Maker/i, /Ice\s+Maker/i, /Nugget\s+Ice\s+Maker/i,
+    /Rice\s+Cooker/i, /Slow\s+Cooker/i, /Pressure\s+Cooker/i,
+    /Toaster\s+Oven/i, /Toaster/i,
+    /Waffle\s+Maker/i, /Sandwich\s+Maker/i,
+    /Dehydrator/i,
+  ];
+  for (const pat of typePatterns) {
+    const m = originalTitle.match(pat);
+    if (m && !fields.productTypes.some(pt => pt.toLowerCase() === m[0].toLowerCase())) {
+      fields.productTypes.push(m[0].trim());
+    }
+  }
+
+  // --- Numeric Specs: extract from TITLE only, preserve exact numbers ---
+  const numExtractors = [
+    { re: /(\d+[\d,]*\.?\d*)\s*Lbs\s*\/\s*H/i, norm: v => v.replace(/,/g, '') + ' Lbs per Hour', label: 'Output Rate' },
+    { re: /(\d+[\d,]*\.?\d*)\s*Pounds?\s*(?:per|\/)\s*Hour/i, norm: v => v.replace(/,/g, '') + ' Lbs per Hour', label: 'Output Rate' },
+    { re: /(\d+\.?\d*)\s*Bar\b/i, norm: v => v + ' Bar', label: 'Pressure' },
+    { re: /(\d{3,4})\s*W(?:att)?\b/i, norm: v => v + 'W', label: 'Wattage' },
+    { re: /(\d+\.?\d*)\s*(?:Liters?|L)\b/i, norm: v => v + ' Liter', label: 'Capacity' },
+    { re: /(\d+\.?\d*)\s*(?:Oz|Ounces?)\b/i, norm: v => v + ' Oz', label: 'Capacity' },
+    { re: /(\d+\.?\d*)\s*Cups?\b/i, norm: v => v + ' Cup', label: 'Capacity' },
+    { re: /(\d+\.?\d*)\s*Quarts?\b/i, norm: v => v + ' Quart', label: 'Capacity' },
+    { re: /(\d+\.?\d*)\s*RPM/i, norm: v => v + ' RPM', label: 'Speed' },
+    { re: /(\d+\.?\d*)\s*(?:[""″\u2033]|Inch)/i, norm: v => v + ' Inch', label: 'Size' },
+    { re: /(\d+\.?\d*)%/i, norm: v => v + ' Percent', label: 'Percentage' },
+  ];
+  const seenLabels = {};
+  for (const { re, norm, label } of numExtractors) {
+    const m = originalTitle.match(re);
+    if (m) {
+      const normalized = norm(m[1]);
+      // Deduplicate by label: keep first (most prominent) match
+      if (!seenLabels[label]) {
+        fields.numericSpecs.push({ raw: m[0], normalized, label, value: m[1] });
+        seenLabels[label] = true;
+      }
+    }
+  }
+  // Supplement wattage from specs ONLY if not in title
+  if (!seenLabels['Wattage']) {
+    for (const [k, v] of specEntries) {
+      if (/wattage/i.test(k)) {
+        const wVal = String(v).replace(/[^0-9.]/g, '');
+        if (wVal) { fields.numericSpecs.push({ raw: v, normalized: wVal + 'W', label: 'Wattage', value: wVal }); break; }
+      }
+    }
+  }
+
+  // --- Output Rate (special for ice machines etc.) ---
+  const outRate = fields.numericSpecs.find(s => s.label === 'Output Rate');
+  if (outRate) fields.outputRate = outRate.normalized;
+
+  // --- Capacity (separate field for clarity) ---
+  const capSpec = fields.numericSpecs.find(s => s.label === 'Capacity');
+  if (capSpec) fields.capacity = capSpec.normalized + ' Capacity';
+
+  // --- Features ---
+  if (/with\s+Grinder|built[\s-]*in\s+grinder/i.test(originalTitle)) fields.features.push('with Grinder');
+  if (/milk\s*frother/i.test(originalTitle)) fields.features.push('with Milk Frother');
+  if (/steam\s*wand/i.test(originalTitle)) fields.features.push('with Steam Wand');
+  if (/dual\s+blades?/i.test(originalTitle)) fields.features.push('Dual Blades');
+  if (/bpa[\s-]*free/i.test(originalTitle)) fields.features.push('BPA Free');
+  if (/easy[\s-]*(?:to[\s-]*)?clean/i.test(originalTitle)) fields.features.push('Easy to Clean');
+  if (/dishwasher[\s-]*safe/i.test(originalTitle)) fields.features.push('Dishwasher Safe');
+  if (/wide\s+feed\s+chute/i.test(originalTitle)) fields.features.push('Wide Feed Chute');
+  if (/whole\s+(fruit|vegetable)/i.test(originalTitle)) fields.features.push('Whole Vegetables and Fruits');
+  if (/high\s*juice\s*yield/i.test(originalTitle)) fields.features.push('High Juice Yield');
+  if (/compact/i.test(originalTitle)) fields.features.push('Compact');
+  if (/removable/i.test(originalTitle)) fields.features.push('Removable');
+  if (/touch\s*screen/i.test(originalTitle)) fields.features.push('Touch Screen');
+  if (/semi[\s-]*automatic/i.test(originalTitle)) fields.features.push('Semi Automatic');
+  if (/quiet/i.test(originalTitle)) fields.features.push('Quiet');
+  if (/reverse\s*(?:function)?/i.test(originalTitle)) fields.features.push('Reverse Function');
+  if (/anti[\s-]*drip|drip[\s-]*free/i.test(originalTitle)) fields.features.push('Anti Drip');
+
+  // --- Certifications ---
+  if (/etl[\s-]*certified/i.test(originalTitle)) fields.certifications.push('ETL Certified');
+  if (/ul[\s-]*(?:certified|listed)/i.test(originalTitle)) fields.certifications.push('UL Certified');
+  if (/ce[\s-]*certified/i.test(originalTitle)) fields.certifications.push('CE Certified');
+  if (/nsf[\s-]*certified/i.test(originalTitle)) fields.certifications.push('NSF Certified');
+  if (/fcc/i.test(originalTitle)) fields.certifications.push('FCC');
+  if (/energy\s*star/i.test(originalTitle)) fields.certifications.push('Energy Star');
+
+  // --- Use Cases ---
+  if (/home.*commercial|commercial.*home/i.test(originalTitle)) fields.useCases.push('Home and Commercial Use');
+  else if (/home.*kitchen/i.test(originalTitle)) fields.useCases.push('for Home Kitchen');
+  else if (/home/i.test(originalTitle) && /commercial/i.test(originalTitle)) fields.useCases.push('Home and Commercial Use');
+  else if (/home/i.test(originalTitle)) fields.useCases.push('for Home');
+  else if (/commercial/i.test(originalTitle)) fields.useCases.push('Commercial Use');
+  // Also check "for X" pattern
+  if (fields.useCases.length === 0) {
+    const forM = originalTitle.match(/for\s+([A-Za-z\s&]+?)(?:\s*[,(]|\s*$)/i);
+    if (forM) fields.useCases.push('for ' + forM[1].trim().replace(/&/g, 'and'));
+  }
+
+  // --- Modifiers ---
+  if (/professional/i.test(originalTitle)) fields.modifiers.push('Professional');
+  if (/commercial/i.test(originalTitle) && !fields.useCases.some(u => /commercial/i.test(u))) fields.modifiers.push('Commercial');
+  else if (/commercial/i.test(originalTitle)) fields.modifiers.push('Commercial');
+  if (/barista/i.test(originalTitle)) fields.modifiers.push('Barista Style');
+  if (/stainless\s*steel/i.test(originalTitle)) fields.modifiers.push('Stainless Steel');
+
+  // ===== PHASE 2: DETECT CATEGORY =====
   let category = 'generic';
-  if (/espresso\s*machine|espresso\s*coffee\s*maker/i.test(originalTitle)) category = 'espresso';
+  if (/snow\s+cone|shaved\s+ice|ice\s+shaver/i.test(originalTitle)) category = 'snow_cone';
+  else if (/espresso\s*machine|espresso\s*coffee\s*maker/i.test(originalTitle)) category = 'espresso';
   else if (/(?:cold\s*press|slow\s*masticating|masticating)\s*juicer|juice\s*extractor|\bjuicer\b/i.test(originalTitle)) category = 'juicer';
   else if (/air\s*fryer/i.test(originalTitle)) category = 'air_fryer';
   else if (/blender/i.test(originalTitle)) category = 'blender';
   else if (/coffee\s*maker/i.test(originalTitle)) category = 'coffee_maker';
   else if (/mixer/i.test(originalTitle)) category = 'mixer';
 
-  // ===== 2. EXTRACT ALL FIELDS =====
+  // ===== PHASE 3: CLASSIFY FIELDS INTO P0/P1/P2 =====
+  const p0 = []; // MUST appear in ALL versions
+  const p1 = []; // Should appear in SEO + Balanced
+  const p2 = []; // Only in SEO if space
 
-  // Color from specs
-  let color = '';
-  for (const [k, v] of specEntries) { if (/^color$/i.test(k.trim())) { color = String(v).trim(); break; } }
+  // Brand is always P0
+  if (fields.brand) p0.push({ text: fields.brand, name: 'Brand' });
 
-  // Wattage from specs then title
-  let wattage = '';
-  for (const [k, v] of specEntries) { if (/wattage/i.test(k)) { wattage = String(v).replace(/[^0-9.]/g, '') + 'W'; break; } }
-  if (!wattage) { const m = originalTitle.match(/(\d{3,4})\s*W(?:att)?/i); if (m) wattage = m[1] + 'W'; }
+  // Category-specific P0/P1/P2
+  if (category === 'snow_cone') {
+    // Core type
+    const snowCone = fields.productTypes.find(t => /snow\s+cone\s+machine/i.test(t));
+    if (snowCone) p0.push({ text: snowCone, name: 'Snow Cone Machine' });
+    // Output rate
+    if (fields.outputRate) p0.push({ text: fields.outputRate, name: 'Output Rate' });
+    // Wattage
+    const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
+    if (wattSpec) p0.push({ text: wattSpec.normalized, name: 'Wattage' });
+    // Use case
+    if (fields.useCases.length) p0.push({ text: fields.useCases[0], name: 'Use Case' });
+    // Color
+    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
 
-  // Capacity from specs then title
-  let capacity = '';
-  for (const [k, v] of specEntries) { if (/capacity|volume|tank\s*capacity/i.test(k)) { capacity = String(v).trim(); break; } }
-  if (!capacity) { const m = originalTitle.match(/(\d+\.?\d*)\s*(Liter|L\b|oz|Quart|Qt|Cup|ml)\b/i); if (m) capacity = m[0].trim(); }
+    // P1
+    const shavedIce = fields.productTypes.find(t => /shaved\s+ice\s+machine/i.test(t));
+    if (shavedIce) p1.push({ text: 'Commercial ' + shavedIce, name: 'Shaved Ice Machine' });
+    else if (fields.modifiers.some(m => m === 'Commercial')) p1.push({ text: 'Commercial', name: 'Commercial' });
+    const iceShaver = fields.productTypes.find(t => /ice\s+shaver/i.test(t));
+    if (iceShaver) p1.push({ text: iceShaver, name: 'Electric Ice Shaver' });
+    if (fields.capacity) p1.push({ text: fields.capacity, name: 'Capacity' });
+    if (fields.features.includes('Dual Blades')) p1.push({ text: 'with Dual Blades', name: 'Dual Blades' });
+    if (fields.certifications.includes('ETL Certified')) p1.push({ text: 'ETL Certified', name: 'ETL Certified' });
 
-  // Pressure (Bar)
-  let pressure = '';
-  const barMatch = originalTitle.match(/(\d+)\s*Bar/i);
-  if (barMatch) pressure = barMatch[0];
+    // P2
+    const snowMaker = fields.productTypes.find(t => /snow\s+cone\s+maker/i.test(t));
+    if (snowMaker && snowMaker !== snowCone) p2.push({ text: snowMaker, name: 'Snow Cone Maker' });
 
-  // Feed Chute Size
-  let feedChute = '';
-  const chuteMatch = originalTitle.match(/([\d.]+)\s*["""″\u2033]|([\d.]+)\s*-?\s*[Ii]nch/);
-  if (chuteMatch) { feedChute = (chuteMatch[1] || chuteMatch[2]) + ' Inch'; }
+  } else if (category === 'espresso') {
+    const espressoMachine = fields.productTypes.find(t => /espresso\s+machine/i.test(t));
+    if (espressoMachine) p0.push({ text: espressoMachine, name: 'Espresso Machine' });
+    if (fields.features.includes('with Grinder')) p0.push({ text: 'with Grinder', name: 'Grinder' });
+    const barSpec = fields.numericSpecs.find(s => s.label === 'Pressure');
+    if (barSpec) p0.push({ text: barSpec.normalized, name: 'Bar Pressure' });
+    if (fields.features.includes('with Milk Frother')) p0.push({ text: 'with Milk Frother', name: 'Milk Frother' });
+    if (fields.useCases.some(u => /home/i.test(u))) p0.push({ text: 'Home Kitchen', name: 'Home Use' });
+    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
 
-  // RPM
-  let rpm = '';
-  const rpmMatch = originalTitle.match(/(\d+)\s*RPM/i);
-  if (rpmMatch) rpm = rpmMatch[0];
+    // P1
+    const espressoMaker = fields.productTypes.find(t => /espresso\s+coffee\s*maker/i.test(t));
+    if (espressoMaker) p1.push({ text: espressoMaker, name: 'Espresso Coffee Maker' });
+    const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
+    if (wattSpec) p1.push({ text: wattSpec.normalized, name: 'Wattage' });
+    if (fields.capacity) p1.push({ text: fields.capacity.replace(' Capacity', '') + ' Water Tank', name: 'Water Tank' });
+    if (/latte/i.test(originalTitle)) p1.push({ text: 'Latte', name: 'Latte' });
+    if (/cappuccino/i.test(originalTitle)) p1.push({ text: 'Cappuccino', name: 'Cappuccino' });
+    if (fields.modifiers.includes('Professional')) p1.push({ text: 'Professional', name: 'Professional' });
+    if (fields.modifiers.includes('Barista Style')) p1.push({ text: 'Barista Style', name: 'Barista Style' });
 
-  // Material
-  let material = '';
-  if (/stainless[\s-]*steel/i.test(titleLower)) material = 'Stainless Steel';
+    // P2
+    if (/americano/i.test(originalTitle)) p2.push({ text: 'Americano', name: 'Americano' });
+    if (fields.modifiers.includes('Stainless Steel')) p2.push({ text: 'Stainless Steel', name: 'Stainless Steel' });
 
-  // Core product type
-  let coreType = '';
-  if (category === 'espresso') {
-    coreType = 'Espresso Machine';
   } else if (category === 'juicer') {
-    if (/cold\s*press/i.test(titleLower)) coreType = 'Cold Press Juicer';
-    else if (/slow\s*masticating|masticating/i.test(titleLower)) coreType = 'Slow Masticating Juicer';
-    else coreType = 'Juicer';
+    const juicerType = fields.productTypes[0] || 'Juicer';
+    p0.push({ text: juicerType, name: 'Core Type' });
+    const inchSpec = fields.numericSpecs.find(s => s.label === 'Size');
+    if (inchSpec) p0.push({ text: inchSpec.normalized + ' Wide Feed Chute', name: 'Feed Chute' });
+    if (fields.useCases.length) p0.push({ text: fields.useCases[0], name: 'Use Case' });
+    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
+
+    // P1
+    const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
+    if (wattSpec) p1.push({ text: wattSpec.normalized, name: 'Wattage' });
+    if (fields.features.includes('BPA Free')) p1.push({ text: 'BPA Free', name: 'BPA Free' });
+    if (fields.features.includes('Easy to Clean')) p1.push({ text: 'Easy to Clean', name: 'Easy to Clean' });
+    if (fields.features.includes('High Juice Yield')) p1.push({ text: 'High Juice Yield', name: 'High Juice Yield' });
+    if (fields.capacity) p1.push({ text: fields.capacity, name: 'Capacity' });
+
+    // P2
+    if (fields.features.includes('Compact')) p2.push({ text: 'Compact', name: 'Compact' });
+    if (fields.features.includes('Quiet')) p2.push({ text: 'Quiet Motor', name: 'Quiet' });
+
   } else {
-    const typePatterns = [
-      { pat: /((?:air\s+fryer|deep\s+fryer)\s*(?:oven)?)/i },
-      { pat: /((?:blender|food\s+processor))/i },
-      { pat: /((?:rice|slow|pressure)\s*cooker)/i },
-      { pat: /((?:stand\s*|hand\s*)?mixer)/i },
-      { pat: /((?:ice\s*cream|gelato)\s*maker)/i },
-      { pat: /((?:waffle|sandwich)\s*maker)/i },
-      { pat: /((?:ice|nugget\s*ice)\s*maker)/i },
-      { pat: /((?:toaster|toaster\s*oven))/i },
-      { pat: /(\w+\s+machine)/i },
-      { pat: /(\w+\s+maker)/i },
-    ];
-    for (const { pat } of typePatterns) { const m = originalTitle.match(pat); if (m) { coreType = m[1].trim(); break; } }
-    if (!coreType) coreType = 'Appliance';
+    // Generic
+    const coreType = fields.productTypes[0] || '';
+    if (coreType) p0.push({ text: coreType, name: 'Core Type' });
+    if (fields.useCases.length) p0.push({ text: fields.useCases[0], name: 'Use Case' });
+    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
+
+    const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
+    if (wattSpec) p1.push({ text: wattSpec.normalized, name: 'Wattage' });
+    if (fields.capacity) p1.push({ text: fields.capacity, name: 'Capacity' });
+    for (const f of fields.features.slice(0, 2)) p1.push({ text: f, name: f });
+    for (const c of fields.certifications) p1.push({ text: c, name: c });
   }
 
-  function normCap(cap) {
-    return cap.replace(/Liters?/i, 'Liter').replace(/Cups?/i, 'Cup').replace(/Ounces?/i, 'Oz').trim();
-  }
-
-  // ===== 3. CATEGORY-SPECIFIC BUILDERS =====
-
-  function buildEspressoSEO() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    p.push('Espresso Machine');
-    if (/with\s*grinder|built[\s-]*in\s*grinder/i.test(titleLower)) p.push('with Grinder');
-    if (pressure) p.push(pressure);
-    if (/professional/i.test(titleLower)) p.push('Professional');
-    p.push('Espresso Coffee Maker');
-    if (wattage) p.push(wattage);
-    if (/milk\s*frother|steam\s*wand/i.test(titleLower)) p.push('with Milk Frother');
-    if (capacity) p.push(normCap(capacity) + ' Water Tank');
-    const drinks = [];
-    if (/latte/i.test(titleLower)) drinks.push('Latte');
-    if (/cappuccino/i.test(titleLower)) drinks.push('Cappuccino');
-    if (/americano/i.test(titleLower)) drinks.push('Americano');
-    if (drinks.length) p.push('for ' + drinks.join(' '));
-    if (/home/i.test(titleLower)) p.push('Home Kitchen');
-    if (/barista/i.test(titleLower) && !/home/i.test(titleLower)) p.push('Barista Style');
-    else if (/barista/i.test(titleLower)) p.push('Barista');
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildEspressoReadable() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    if (pressure) p.push(pressure);
-    p.push('Espresso Machine');
-    if (/with\s*grinder|built[\s-]*in\s*grinder/i.test(titleLower)) p.push('with Grinder');
-    if (/milk\s*frother|steam\s*wand/i.test(titleLower)) p.push('and Milk Frother');
-    const drinks = [];
-    if (/latte/i.test(titleLower)) drinks.push('Latte');
-    if (/cappuccino/i.test(titleLower)) drinks.push('Cappuccino');
-    if (drinks.length) p.push('for ' + drinks.join(' '));
-    if (/barista/i.test(titleLower) && /home/i.test(titleLower)) p.push('and Home Barista Coffee');
-    else if (/home/i.test(titleLower)) p.push('for Home Kitchen');
-    else if (/barista/i.test(titleLower)) p.push('for Barista Coffee');
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildEspressoBalanced() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    p.push('Espresso Machine');
-    if (/with\s*grinder|built[\s-]*in\s*grinder/i.test(titleLower)) p.push('with Grinder');
-    if (pressure) p.push(pressure);
-    p.push('Espresso Coffee Maker');
-    if (wattage) p.push(wattage);
-    if (/milk\s*frother|steam\s*wand/i.test(titleLower)) p.push('with Milk Frother');
-    if (capacity) p.push(normCap(capacity) + ' Water Tank');
-    const drinks = [];
-    if (/latte/i.test(titleLower)) drinks.push('Latte');
-    if (/cappuccino/i.test(titleLower)) drinks.push('Cappuccino');
-    if (drinks.length) p.push('for ' + drinks.join(' '));
-    if (/home/i.test(titleLower)) p.push('Home Kitchen');
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildJuicerSEO() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    p.push(coreType);
-    if (feedChute) p.push(feedChute + ' Wide Feed Chute');
-    if (/whole\s*(fruit|vegetable)/i.test(titleLower)) p.push('for Whole Vegetables and Fruits');
-    else if (/vegetables?\s*and\s*fruits?|fruits?\s*and\s*vegetables?/i.test(titleLower)) p.push('for Vegetables and Fruits');
-    if (wattage) p.push(wattage);
-    if (rpm) p.push(rpm);
-    if (/high\s*juice\s*yield|\d+\.?\d*%\s*juice/i.test(titleLower)) p.push('High Juice Yield');
-    if (/bpa[\s-]*free/i.test(titleLower)) p.push('BPA Free');
-    if (/easy[\s-]*(?:to[\s-]*)?clean/i.test(titleLower)) p.push('Easy to Clean');
-    if (capacity) p.push(normCap(capacity));
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildJuicerReadable() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    if (feedChute) p.push(feedChute);
-    p.push(coreType);
-    if (/bpa[\s-]*free/i.test(titleLower)) p.push('BPA Free');
-    if (/whole\s*(fruit|vegetable)/i.test(titleLower)) p.push('for Whole Vegetables and Fruits');
-    else if (/vegetables?\s*and\s*fruits?/i.test(titleLower)) p.push('for Vegetables and Fruits');
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildJuicerBalanced() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    p.push(coreType);
-    if (feedChute) p.push(feedChute + ' Feed Chute');
-    if (wattage) p.push(wattage);
-    if (/bpa[\s-]*free/i.test(titleLower)) p.push('BPA Free');
-    if (/high\s*juice\s*yield|\d+\.?\d*%\s*juice/i.test(titleLower)) p.push('High Juice Yield');
-    if (/easy[\s-]*(?:to[\s-]*)?clean/i.test(titleLower)) p.push('Easy to Clean');
-    if (/whole\s*(fruit|vegetable)/i.test(titleLower)) p.push('for Whole Vegetables and Fruits');
-    else if (/vegetables?\s*and\s*fruits?/i.test(titleLower)) p.push('for Vegetables and Fruits');
-    if (capacity) p.push(normCap(capacity));
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildGenericSEO() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    if (coreType) p.push(coreType);
-    if (wattage) p.push(wattage);
-    if (capacity) p.push(normCap(capacity));
-    if (feedChute) p.push(feedChute + ' Wide Feed Chute');
-    if (rpm) p.push(rpm);
-    if (/bpa[\s-]*free/i.test(titleLower)) p.push('BPA Free');
-    if (/easy[\s-]*(?:to[\s-]*)?clean/i.test(titleLower)) p.push('Easy to Clean');
-    if (/dishwasher[\s-]*safe/i.test(titleLower)) p.push('Dishwasher Safe');
-    if (material) p.push(material);
-    if (/home/i.test(titleLower) && /kitchen/i.test(titleLower)) p.push('for Home Kitchen');
-    else if (/home/i.test(titleLower)) p.push('for Home');
-    else if (/kitchen/i.test(titleLower)) p.push('for Kitchen');
-    if (/commercial/i.test(titleLower)) p.push('Commercial');
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildGenericReadable() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    if (coreType) p.push(coreType);
-    if (wattage) p.push(wattage);
-    if (/home/i.test(titleLower)) p.push('for Home Kitchen');
-    if (color) p.push(color);
-    return p;
-  }
-
-  function buildGenericBalanced() {
-    const p = [];
-    if (brandClean) p.push(brandClean);
-    if (coreType) p.push(coreType);
-    if (wattage) p.push(wattage);
-    if (capacity) p.push(normCap(capacity));
-    if (/bpa[\s-]*free/i.test(titleLower)) p.push('BPA Free');
-    if (/easy[\s-]*(?:to[\s-]*)?clean/i.test(titleLower)) p.push('Easy to Clean');
-    if (material) p.push(material);
-    if (/home/i.test(titleLower)) p.push('for Home Kitchen');
-    if (color) p.push(color);
-    return p;
-  }
-
-  // ===== 4. SELECT BUILDERS & ASSEMBLE =====
-  let seoParts, readParts, balParts;
-  if (category === 'espresso') { seoParts = buildEspressoSEO(); readParts = buildEspressoReadable(); balParts = buildEspressoBalanced(); }
-  else if (category === 'juicer') { seoParts = buildJuicerSEO(); readParts = buildJuicerReadable(); balParts = buildJuicerBalanced(); }
-  else { seoParts = buildGenericSEO(); readParts = buildGenericReadable(); balParts = buildGenericBalanced(); }
-
+  // ===== PHASE 4: ASSEMBLE 3 VERSIONS =====
+  // Clean function: only normalize, never delete content
   function clean(s) {
-    return s.replace(/["""\u201c\u201d\u2033]/g, 'Inch ')
-      .replace(/(\d+\.?\d*)%/g, '$1 Percent')
-      .replace(/&/g, 'and')
-      .replace(/[,;]+/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return s.replace(/&/g, 'and').replace(/[,;]+/g, '').replace(/\s+/g, ' ').trim();
   }
 
-  // Smart dedup: only remove generic words appearing 3+ times (machine, maker)
-  function smartDedup(titleStr) {
-    const words = titleStr.split(/\s+/);
-    const count = {};
-    words.forEach(w => { const wl = w.toLowerCase().replace(/[.,;:]/g, ''); if (wl.length > 2) count[wl] = (count[wl] || 0) + 1; });
-    const result = [];
-    const seen = {};
-    for (const w of words) {
-      const wl = w.toLowerCase().replace(/[.,;:]/g, '');
-      // Only dedup ultra-generic words (machine, maker, the) when 3+ occurrences
-      if (['machine', 'maker', 'the'].includes(wl) && (count[wl] || 0) > 2 && seen[wl] >= 2) continue;
-      seen[wl] = (seen[wl] || 0) + 1;
-      result.push(w);
+  function assemble(p0Fields, p1Fields, p2Fields, version) {
+    const parts = [];
+    // Always include ALL P0 fields
+    for (const f of p0Fields) parts.push(f.text);
+
+    // P1 fields: SEO=all, Balanced=all, Readable=selective
+    if (version === 'seo' || version === 'bal') {
+      for (const f of p1Fields) parts.push(f.text);
+    } else {
+      // Readable: only include first 2-3 P1 fields
+      for (let i = 0; i < Math.min(3, p1Fields.length); i++) parts.push(p1Fields[i].text);
     }
-    return result.join(' ');
-  }
 
-  let seoTitle = smartDedup(clean(seoParts.join(' ')));
-  let readTitle = smartDedup(clean(readParts.join(' ')));
-  let balTitle = smartDedup(clean(balParts.join(' ')));
+    // P2: only for SEO if space
+    if (version === 'seo') {
+      for (const f of p2Fields) parts.push(f.text);
+    }
 
-  // Trim from end if over max
-  function trimToMax(title, maxLen) {
-    if (title.length <= maxLen) return title;
-    const words = title.split(' ');
-    while (words.join(' ').length > maxLen && words.length > 5) words.pop();
-    return words.join(' ');
-  }
-  seoTitle = trimToMax(seoTitle, 200);
-  balTitle = trimToMax(balTitle, 175);
-  readTitle = trimToMax(readTitle, 155);
+    let title = clean(parts.join(' '));
 
-  // ===== 5. AUTO-SUPPLEMENT SHORT SEO TITLES =====
-  if (seoTitle.length < 160 && category === 'espresso') {
-    const extras = [];
-    if (/professional/i.test(titleLower) && !/professional/i.test(seoTitle)) extras.push('Professional');
-    if (/americano/i.test(titleLower) && !/americano/i.test(seoTitle)) extras.push('Americano');
-    if (/stainless\s*steel/i.test(titleLower) && !/stainless/i.test(seoTitle)) extras.push('Stainless Steel');
-    if (/compact/i.test(titleLower) && !/compact/i.test(seoTitle)) extras.push('Compact');
-    if (/semi[\s-]*automatic/i.test(titleLower) && !/semi/i.test(seoTitle)) extras.push('Semi Automatic');
-    if (/touch\s*screen/i.test(titleLower) && !/touch/i.test(seoTitle)) extras.push('Touch Screen');
-    if (/removable/i.test(titleLower) && !/removable/i.test(seoTitle)) extras.push('Removable Water Tank');
-    for (const extra of extras) {
-      if (seoTitle.length + extra.length + 1 <= 195) {
-        if (color && seoTitle.toLowerCase().endsWith(color.toLowerCase())) {
-          seoTitle = seoTitle.slice(0, seoTitle.length - color.length).trim() + ' ' + extra + ' ' + color;
-        } else {
-          seoTitle += ' ' + extra;
+    // Trim from end ONLY P2/P1 fields if over max (never trim P0)
+    const maxLen = version === 'seo' ? 200 : version === 'bal' ? 180 : 160;
+    if (title.length > maxLen) {
+      // Remove P2 fields one by one from the end
+      for (const f of [...p2Fields].reverse()) {
+        if (title.length <= maxLen) break;
+        const fClean = clean(f.text);
+        const idx = title.lastIndexOf(fClean);
+        if (idx > -1) title = clean(title.slice(0, idx) + title.slice(idx + fClean.length));
+      }
+      // If still too long, remove P1 from end
+      if (title.length > maxLen) {
+        for (const f of [...p1Fields].reverse()) {
+          if (title.length <= maxLen) break;
+          const fClean = clean(f.text);
+          const idx = title.lastIndexOf(fClean);
+          if (idx > -1 && idx > title.indexOf(clean(p0Fields[p0Fields.length - 1]?.text || ''))) {
+            title = clean(title.slice(0, idx) + title.slice(idx + fClean.length));
+          }
         }
       }
     }
-  }
-  if (seoTitle.length < 160 && category === 'juicer') {
-    const extras = [];
-    if (/quiet/i.test(titleLower) && !/quiet/i.test(seoTitle)) extras.push('Quiet Motor');
-    if (/reverse/i.test(titleLower) && !/reverse/i.test(seoTitle)) extras.push('Reverse Function');
-    if (/drip[\s-]*free|anti[\s-]*drip/i.test(titleLower) && !/drip/i.test(seoTitle)) extras.push('Anti Drip');
-    if (/compact/i.test(titleLower) && !/compact/i.test(seoTitle)) extras.push('Compact');
-    if (/dishwasher/i.test(titleLower) && !/dishwasher/i.test(seoTitle)) extras.push('Dishwasher Safe');
-    if (/nutrition/i.test(titleLower) && !/nutrition/i.test(seoTitle)) extras.push('Nutrition');
-    for (const extra of extras) {
-      if (seoTitle.length + extra.length + 1 <= 195) {
-        if (color && seoTitle.toLowerCase().endsWith(color.toLowerCase())) {
-          seoTitle = seoTitle.slice(0, seoTitle.length - color.length).trim() + ' ' + extra + ' ' + color;
-        } else {
-          seoTitle += ' ' + extra;
-        }
-      }
-    }
+
+    return title;
   }
 
-  // ===== 6. QUALITY CHECKS =====
-  function checkTitleQuality(title, targetMin, targetMax) {
+  let seoTitle = assemble(p0, p1, p2, 'seo');
+  let readTitle = assemble(p0, p1, p2, 'read');
+  let balTitle = assemble(p0, p1, p2, 'bal');
+
+  // ===== PHASE 5: QUALITY CHECKS =====
+  function checkQuality(title, version) {
     const c = {};
     c.charCount = title.length;
-    c.brandFirst = brandClean ? title.toLowerCase().startsWith(brandClean.toLowerCase()) : true;
-    c.hasCoreType = coreType ? title.toLowerCase().includes(coreType.toLowerCase().split(' ').slice(-1)[0]) : true;
+    c.brandFirst = fields.brand ? title.toLowerCase().startsWith(fields.brand.toLowerCase()) : true;
+
+    // Target ranges
+    const targets = {
+      seo: { min: 160, max: 190 },
+      read: { min: 110, max: 160 },
+      bal: { min: 140, max: 175 },
+    };
+    const t = targets[version] || targets.bal;
+
+    // P0 coverage
+    c.coveredKeywords = [];
+    c.missingP0 = [];
+    for (const f of p0) {
+      if (title.toLowerCase().includes(f.text.toLowerCase().split(' ')[0])) {
+        c.coveredKeywords.push(f.name);
+      } else {
+        c.missingP0.push(f.name);
+      }
+    }
+    // Also check P1
+    for (const f of p1) {
+      if (title.toLowerCase().includes(f.text.toLowerCase().split(' ')[0])) {
+        c.coveredKeywords.push(f.name);
+      }
+    }
+    if (fields.color && title.toLowerCase().includes(fields.color.toLowerCase())) c.coveredKeywords.push('Color');
+
+    // Parameter integrity: verify all numbers from original title appear in output
+    c.paramIntegrity = true;
+    c.alteredParams = [];
+    for (const spec of fields.numericSpecs) {
+      const numVal = spec.value.replace(/,/g, '');
+      if (!title.includes(numVal)) {
+        c.paramIntegrity = false;
+        c.alteredParams.push(spec.raw + ' → missing or changed');
+      }
+    }
+
+    // Core word integrity
+    c.coreWordIntegrity = true;
+    c.droppedCoreWords = [];
+    for (const pt of fields.productTypes) {
+      // Check if the core noun from each product type appears
+      const coreWord = pt.split(' ').pop(); // e.g., "Machine", "Shaver", "Maker"
+      const precedingWord = pt.split(' ').slice(-2, -1)[0]; // e.g., "Cone", "Ice"
+      if (precedingWord && !title.toLowerCase().includes(precedingWord.toLowerCase())) {
+        c.coreWordIntegrity = false;
+        c.droppedCoreWords.push(pt);
+      }
+    }
+
+    // Certification check
+    c.droppedCertifications = [];
+    for (const cert of fields.certifications) {
+      if (!title.toLowerCase().includes(cert.toLowerCase().split(' ')[0])) {
+        c.droppedCertifications.push(cert);
+      }
+    }
+
+    // Special chars
     c.hasSpecialChars = /["""\u201c\u201d\u2033&%]/.test(title);
 
-    // Repeated words (>2 occurrences of same word)
+    // Repeated words (3+ of same word)
     const wc = {};
     title.toLowerCase().split(/\s+/).forEach(w => { const wl = w.replace(/[.,;:]/g, ''); if (wl.length > 3) wc[wl] = (wc[wl] || 0) + 1; });
     c.repeatedWords = Object.entries(wc).filter(([, v]) => v > 2).map(([w]) => w);
 
-    // Field coverage
-    c.missingP0 = [];
-    c.coveredKeywords = [];
-    if (brandClean && c.brandFirst) c.coveredKeywords.push('Brand');
-    if (c.hasCoreType && coreType) c.coveredKeywords.push(coreType);
-
-    if (category === 'espresso') {
-      const p0 = [
-        { name: 'Grinder', test: /grinder/i },
-        { name: 'Bar Pressure', test: /\d+\s*bar/i },
-        { name: 'Milk Frother', test: /milk\s*frother|frother/i },
-        { name: 'Home Use', test: /home/i },
-      ];
-      const p1 = [
-        { name: 'Wattage', test: /\d{3,4}w/i },
-        { name: 'Water Tank', test: /water\s*tank|liter/i },
-        { name: 'Latte', test: /latte/i },
-        { name: 'Cappuccino', test: /cappuccino/i },
-        { name: 'Professional', test: /professional/i },
-        { name: 'Espresso Coffee Maker', test: /espresso\s*coffee\s*maker/i },
-      ];
-      for (const f of p0) { if (f.test.test(title)) c.coveredKeywords.push(f.name); else c.missingP0.push(f.name); }
-      for (const f of p1) { if (f.test.test(title)) c.coveredKeywords.push(f.name); }
-    } else if (category === 'juicer') {
-      const p0 = [
-        { name: 'Feed Chute', test: /inch|chute/i },
-        { name: 'BPA Free', test: /bpa/i },
-        { name: 'Easy to Clean', test: /easy.*clean/i },
-      ];
-      const p1 = [
-        { name: 'Wattage', test: /\d{3,4}w/i },
-        { name: 'Juice Yield', test: /yield|percent/i },
-        { name: 'Capacity', test: /liter|oz|cup|capacity/i },
-      ];
-      for (const f of p0) { if (f.test.test(title)) c.coveredKeywords.push(f.name); else c.missingP0.push(f.name); }
-      for (const f of p1) { if (f.test.test(title)) c.coveredKeywords.push(f.name); }
-    }
-    if (color && title.toLowerCase().includes(color.toLowerCase())) c.coveredKeywords.push('Color');
-
     // Parameter claims needing verification
     c.parameterClaims = [];
-    if (/\d+\s*bar/i.test(title)) c.parameterClaims.push('Bar Pressure');
-    if (/\d{3,4}w/i.test(title)) c.parameterClaims.push('Wattage');
-    if (/liter/i.test(title)) c.parameterClaims.push('Capacity');
+    for (const spec of fields.numericSpecs) {
+      if (title.includes(spec.value.replace(/,/g, ''))) {
+        c.parameterClaims.push(spec.label + ': ' + spec.normalized);
+      }
+    }
 
-    // Length
+    // Length assessment
     c.tooShort = title.length < 100;
-    c.belowTarget = title.length < targetMin;
-    c.overTarget = title.length > targetMax;
+    c.belowTarget = title.length < t.min;
+    c.overTarget = title.length > t.max;
 
-    // Quality grade
-    let gs = 0;
-    if (title.length >= targetMin && title.length <= targetMax) gs += 2; else if (title.length >= 100) gs += 1;
-    if (c.brandFirst) gs += 2;
-    if (c.missingP0.length === 0) gs += 3; else if (c.missingP0.length <= 1) gs += 1;
-    if (!c.hasSpecialChars) gs += 1;
-    if (c.repeatedWords.length === 0) gs += 1;
-    if (c.hasCoreType) gs += 1;
-    if (gs >= 9) c.qualityGrade = 'Optimized';
-    else if (gs >= 7) c.qualityGrade = 'Great';
-    else if (gs >= 5) c.qualityGrade = 'Good';
-    else if (gs >= 3) c.qualityGrade = 'Fair';
-    else c.qualityGrade = 'Poor';
+    // ===== SCORING =====
+    let score = 10; // Start from 10, max 10
+
+    if (c.charCount >= t.min && c.charCount <= t.max) score -= 0; // perfect
+    else if (c.charCount < 80) score -= 5;
+    else if (c.charCount < 100) score -= 3;
+    else if (c.charCount < t.min) score -= 1;
+    else if (c.charCount > t.max) score -= 1;
+
+    if (!c.brandFirst) score -= 1;
+    if (c.missingP0.length > 0) score -= Math.min(c.missingP0.length * 2, 4);
+    if (!c.paramIntegrity) score -= 4; // Parameter altered = severe
+    if (!c.coreWordIntegrity) score -= 4; // Core word dropped = severe
+    if (c.droppedCertifications.length > 0) score -= Math.min(c.droppedCertifications.length * 2, 3);
+    if (c.hasSpecialChars) score -= 1;
+    if (c.repeatedWords.length > 0) score -= 1;
+
+    score = Math.max(0, Math.min(10, score));
+
+    // Grade mapping
+    if (!c.paramIntegrity || !c.coreWordIntegrity) c.qualityGrade = 'Poor';
+    else if (score >= 9) c.qualityGrade = 'Optimized';
+    else if (score >= 7 && c.missingP0.length === 0) c.qualityGrade = 'Great';
+    else if (score >= 5 && c.charCount >= 80) c.qualityGrade = 'Good';
+    else if (c.charCount < 80) c.qualityGrade = 'Fair';
+    else c.qualityGrade = 'Fair';
 
     return c;
   }
 
-  const seoChecks = checkTitleQuality(seoTitle, 160, 190);
-  const balChecks = checkTitleQuality(balTitle, 140, 170);
-  const readChecks = checkTitleQuality(readTitle, 110, 150);
+  const seoChecks = checkQuality(seoTitle, 'seo');
+  const readChecks = checkQuality(readTitle, 'read');
+  const balChecks = checkQuality(balTitle, 'bal');
 
-  // ===== 7. BUILD WARNINGS =====
+  // ===== PHASE 6: BUILD WARNINGS =====
   function buildWarnings(checks) {
     const w = [];
     if (checks.tooShort) w.push({ type: 'yellow', text: '标题偏短，可能损失搜索词覆盖，建议补充核心功能参数或使用场景。' });
     if (checks.missingP0.length > 0) w.push({ type: 'red', text: `标题缺失核心转化字段: ${checks.missingP0.join('、')}，可能影响点击率和转化率。` });
+    if (!checks.paramIntegrity) w.push({ type: 'red', text: `参数被篡改: ${checks.alteredParams.join('；')}，原始数值必须保留。` });
+    if (!checks.coreWordIntegrity) w.push({ type: 'red', text: `核心词被删除: ${checks.droppedCoreWords.join('、')}，类目核心词不可丢弃。` });
+    if (checks.droppedCertifications.length > 0) w.push({ type: 'yellow', text: `认证被删除: ${checks.droppedCertifications.join('、')}，建议保留认证信息。` });
     if (checks.hasSpecialChars) w.push({ type: 'yellow', text: '标题包含特殊字符，建议替换为标准格式。' });
-    if (checks.repeatedWords.length > 0) w.push({ type: 'yellow', text: `标题存在重复关键词: ${checks.repeatedWords.join('、')}，建议合并同义词。` });
+    if (checks.repeatedWords.length > 0) w.push({ type: 'yellow', text: `标题存在重复关键词: ${checks.repeatedWords.join('、')}，建议合并。` });
     if (checks.parameterClaims.length > 0) w.push({ type: 'info', text: `${checks.parameterClaims.join('、')}属于参数型声明，请确保与后台属性和说明书一致。` });
     return w;
   }
 
   return [
-    { label: 'SEO优先版', desc: '关键词覆盖最大化，适合新品、广告投放、搜索流量导向', title: seoTitle, charCount: seoTitle.length, qualityGrade: seoChecks.qualityGrade, coveredKeywords: seoChecks.coveredKeywords, missingP0: seoChecks.missingP0, warnings: buildWarnings(seoChecks) },
-    { label: '可读性优先版', desc: '自然流畅，保留核心功能，适合品牌调性和前台点击', title: readTitle, charCount: readTitle.length, qualityGrade: readChecks.qualityGrade, coveredKeywords: readChecks.coveredKeywords, missingP0: readChecks.missingP0, warnings: buildWarnings(readChecks) },
-    { label: '平衡版', desc: '兼顾SEO、CDQ合规和用户阅读，推荐默认使用', title: balTitle, charCount: balTitle.length, qualityGrade: balChecks.qualityGrade, coveredKeywords: balChecks.coveredKeywords, missingP0: balChecks.missingP0, warnings: buildWarnings(balChecks) },
+    { label: 'SEO优先版', desc: '关键词覆盖最大化，适合新品、广告投放、搜索流量导向', title: seoTitle, charCount: seoTitle.length, qualityGrade: seoChecks.qualityGrade, coveredKeywords: seoChecks.coveredKeywords, missingP0: seoChecks.missingP0, paramIntegrity: seoChecks.paramIntegrity, warnings: buildWarnings(seoChecks) },
+    { label: '可读性优先版', desc: '自然流畅，保留核心功能，适合品牌调性和前台点击', title: readTitle, charCount: readTitle.length, qualityGrade: readChecks.qualityGrade, coveredKeywords: readChecks.coveredKeywords, missingP0: readChecks.missingP0, paramIntegrity: readChecks.paramIntegrity, warnings: buildWarnings(readChecks) },
+    { label: '平衡版', desc: '兼顾SEO、CDQ合规和用户阅读，推荐默认使用', title: balTitle, charCount: balTitle.length, qualityGrade: balChecks.qualityGrade, coveredKeywords: balChecks.coveredKeywords, missingP0: balChecks.missingP0, paramIntegrity: balChecks.paramIntegrity, warnings: buildWarnings(balChecks) },
   ];
 }
 
