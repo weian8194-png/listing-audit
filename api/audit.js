@@ -473,165 +473,233 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
   else if (/coffee\s*maker/i.test(originalTitle)) category = 'coffee_maker';
   else if (/mixer/i.test(originalTitle)) category = 'mixer';
 
-  // ===== PHASE 3: CLASSIFY FIELDS INTO P0/P1/P2 =====
-  const p0 = []; // MUST appear in ALL versions
-  const p1 = []; // Should appear in SEO + Balanced
-  const p2 = []; // Only in SEO if space
+  // ===== PHASE 3: CLASSIFY FIELDS INTO POSITIONAL SLOTS =====
+  // Assembly order: Brand → Core Product Type → Key Specs → Features/Functions → Use Cases → Selling Points/Certs → Material/Color
+  const brandSlot = { text: fields.brand || '', name: 'Brand' }; // Position 1
+  const coreTypeSlot = []; // Position 2: highest search value product type
+  const specSlot = []; // Position 3: numeric specs (output rate, wattage, pressure, capacity, size)
+  const featureSlot = []; // Position 4: features/functions (grinder, frother, dual blades, etc.)
+  const useCaseSlot = []; // Position 5: use cases (home, commercial, etc.)
+  const sellingPointSlot = []; // Position 6: modifiers, certifications, drink types
+  const materialColorSlot = []; // Position 7: material + color (always last)
 
-  // Brand is always P0
-  if (fields.brand) p0.push({ text: fields.brand, name: 'Brand' });
-
-  // Category-specific P0/P1/P2
   if (category === 'snow_cone') {
-    // Core type
     const snowCone = fields.productTypes.find(t => /snow\s+cone\s+machine/i.test(t));
-    if (snowCone) p0.push({ text: snowCone, name: 'Snow Cone Machine' });
-    // Output rate
-    if (fields.outputRate) p0.push({ text: fields.outputRate, name: 'Output Rate' });
-    // Wattage
+    if (snowCone) coreTypeSlot.push({ text: snowCone, name: 'Snow Cone Machine' });
+    if (fields.outputRate) specSlot.push({ text: fields.outputRate, name: 'Output Rate' });
     const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
-    if (wattSpec) p0.push({ text: wattSpec.normalized, name: 'Wattage' });
-    // Use case
-    if (fields.useCases.length) p0.push({ text: fields.useCases[0], name: 'Use Case' });
-    // Color
-    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
-
-    // P1
+    if (wattSpec) specSlot.push({ text: wattSpec.normalized, name: 'Wattage' });
+    if (fields.capacity) specSlot.push({ text: fields.capacity, name: 'Capacity' });
     const shavedIce = fields.productTypes.find(t => /shaved\s+ice\s+machine/i.test(t));
-    if (shavedIce) p1.push({ text: 'Commercial ' + shavedIce, name: 'Shaved Ice Machine' });
-    else if (fields.modifiers.some(m => m === 'Commercial')) p1.push({ text: 'Commercial', name: 'Commercial' });
+    if (shavedIce) featureSlot.push({ text: shavedIce, name: 'Shaved Ice Machine' });
     const iceShaver = fields.productTypes.find(t => /ice\s+shaver/i.test(t));
-    if (iceShaver) p1.push({ text: iceShaver, name: 'Electric Ice Shaver' });
-    if (fields.capacity) p1.push({ text: fields.capacity, name: 'Capacity' });
-    if (fields.features.includes('Dual Blades')) p1.push({ text: 'with Dual Blades', name: 'Dual Blades' });
-    if (fields.certifications.includes('ETL Certified')) p1.push({ text: 'ETL Certified', name: 'ETL Certified' });
-
-    // P2
+    if (iceShaver) featureSlot.push({ text: iceShaver, name: 'Electric Ice Shaver' });
+    if (fields.features.includes('Dual Blades')) featureSlot.push({ text: 'with Dual Blades', name: 'Dual Blades' });
+    if (fields.useCases.length) useCaseSlot.push({ text: fields.useCases[0], name: 'Use Case' });
+    if (fields.certifications.includes('ETL Certified')) sellingPointSlot.push({ text: 'ETL Certified', name: 'ETL Certified' });
     const snowMaker = fields.productTypes.find(t => /snow\s+cone\s+maker/i.test(t));
-    if (snowMaker && snowMaker !== snowCone) p2.push({ text: snowMaker, name: 'Snow Cone Maker' });
+    if (snowMaker) sellingPointSlot.push({ text: snowMaker, name: 'Snow Cone Maker' });
+    if (fields.color) materialColorSlot.push({ text: fields.color, name: 'Color' });
 
   } else if (category === 'espresso') {
     const espressoMachine = fields.productTypes.find(t => /espresso\s+machine/i.test(t));
-    if (espressoMachine) p0.push({ text: espressoMachine, name: 'Espresso Machine' });
-    if (fields.features.includes('with Grinder')) p0.push({ text: 'with Grinder', name: 'Grinder' });
+    if (espressoMachine) coreTypeSlot.push({ text: espressoMachine, name: 'Espresso Machine' });
     const barSpec = fields.numericSpecs.find(s => s.label === 'Pressure');
-    if (barSpec) p0.push({ text: barSpec.normalized, name: 'Bar Pressure' });
-    if (fields.features.includes('with Milk Frother')) p0.push({ text: 'with Milk Frother', name: 'Milk Frother' });
-    if (fields.useCases.some(u => /home/i.test(u))) p0.push({ text: 'Home Kitchen', name: 'Home Use' });
-    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
-
-    // P1
-    const espressoMaker = fields.productTypes.find(t => /espresso\s+coffee\s*maker/i.test(t));
-    if (espressoMaker) p1.push({ text: espressoMaker, name: 'Espresso Coffee Maker' });
+    if (barSpec) specSlot.push({ text: barSpec.normalized, name: 'Bar Pressure' });
     const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
-    if (wattSpec) p1.push({ text: wattSpec.normalized, name: 'Wattage' });
-    if (fields.capacity) p1.push({ text: fields.capacity.replace(' Capacity', '') + ' Water Tank', name: 'Water Tank' });
-    if (/latte/i.test(originalTitle)) p1.push({ text: 'Latte', name: 'Latte' });
-    if (/cappuccino/i.test(originalTitle)) p1.push({ text: 'Cappuccino', name: 'Cappuccino' });
-    if (fields.modifiers.includes('Professional')) p1.push({ text: 'Professional', name: 'Professional' });
-    if (fields.modifiers.includes('Barista Style')) p1.push({ text: 'Barista Style', name: 'Barista Style' });
-
-    // P2
-    if (/americano/i.test(originalTitle)) p2.push({ text: 'Americano', name: 'Americano' });
-    if (fields.modifiers.includes('Stainless Steel')) p2.push({ text: 'Stainless Steel', name: 'Stainless Steel' });
+    if (wattSpec) specSlot.push({ text: wattSpec.normalized, name: 'Wattage' });
+    if (fields.capacity) specSlot.push({ text: fields.capacity.replace(' Capacity', '') + ' Water Tank', name: 'Water Tank' });
+    if (fields.features.includes('with Grinder')) featureSlot.push({ text: 'with Grinder', name: 'Grinder' });
+    if (fields.features.includes('with Milk Frother')) featureSlot.push({ text: 'with Milk Frother', name: 'Milk Frother' });
+    const espressoMaker = fields.productTypes.find(t => /espresso\s+coffee\s*maker/i.test(t));
+    if (espressoMaker) featureSlot.push({ text: espressoMaker, name: 'Espresso Coffee Maker' });
+    if (fields.useCases.length) useCaseSlot.push({ text: fields.useCases[0], name: 'Use Case' });
+    if (fields.modifiers.includes('Professional')) sellingPointSlot.push({ text: 'Professional', name: 'Professional' });
+    if (fields.modifiers.includes('Barista Style')) sellingPointSlot.push({ text: 'Barista Style', name: 'Barista Style' });
+    if (/latte/i.test(originalTitle)) sellingPointSlot.push({ text: 'Latte', name: 'Latte' });
+    if (/cappuccino/i.test(originalTitle)) sellingPointSlot.push({ text: 'Cappuccino', name: 'Cappuccino' });
+    if (/americano/i.test(originalTitle)) sellingPointSlot.push({ text: 'Americano', name: 'Americano' });
+    if (fields.modifiers.includes('Stainless Steel')) materialColorSlot.push({ text: 'Stainless Steel', name: 'Material' });
+    if (fields.color) materialColorSlot.push({ text: fields.color, name: 'Color' });
 
   } else if (category === 'juicer') {
     const juicerType = fields.productTypes[0] || 'Juicer';
-    p0.push({ text: juicerType, name: 'Core Type' });
+    coreTypeSlot.push({ text: juicerType, name: 'Core Type' });
     const inchSpec = fields.numericSpecs.find(s => s.label === 'Size');
-    if (inchSpec) p0.push({ text: inchSpec.normalized + ' Wide Feed Chute', name: 'Feed Chute' });
-    if (fields.useCases.length) p0.push({ text: fields.useCases[0], name: 'Use Case' });
-    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
-
-    // P1
+    if (inchSpec) specSlot.push({ text: inchSpec.normalized + ' Wide Feed Chute', name: 'Feed Chute' });
     const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
-    if (wattSpec) p1.push({ text: wattSpec.normalized, name: 'Wattage' });
-    if (fields.features.includes('BPA Free')) p1.push({ text: 'BPA Free', name: 'BPA Free' });
-    if (fields.features.includes('Easy to Clean')) p1.push({ text: 'Easy to Clean', name: 'Easy to Clean' });
-    if (fields.features.includes('High Juice Yield')) p1.push({ text: 'High Juice Yield', name: 'High Juice Yield' });
-    if (fields.capacity) p1.push({ text: fields.capacity, name: 'Capacity' });
-
-    // P2
-    if (fields.features.includes('Compact')) p2.push({ text: 'Compact', name: 'Compact' });
-    if (fields.features.includes('Quiet')) p2.push({ text: 'Quiet Motor', name: 'Quiet' });
+    if (wattSpec) specSlot.push({ text: wattSpec.normalized, name: 'Wattage' });
+    if (fields.capacity) specSlot.push({ text: fields.capacity, name: 'Capacity' });
+    if (fields.features.includes('BPA Free')) featureSlot.push({ text: 'BPA Free', name: 'BPA Free' });
+    if (fields.features.includes('Easy to Clean')) featureSlot.push({ text: 'Easy to Clean', name: 'Easy to Clean' });
+    if (fields.features.includes('High Juice Yield')) sellingPointSlot.push({ text: 'High Juice Yield', name: 'High Juice Yield' });
+    if (fields.useCases.length) useCaseSlot.push({ text: fields.useCases[0], name: 'Use Case' });
+    if (fields.features.includes('Compact')) sellingPointSlot.push({ text: 'Compact', name: 'Compact' });
+    if (fields.features.includes('Quiet')) sellingPointSlot.push({ text: 'Quiet Motor', name: 'Quiet' });
+    if (fields.color) materialColorSlot.push({ text: fields.color, name: 'Color' });
 
   } else {
     // Generic
     const coreType = fields.productTypes[0] || '';
-    if (coreType) p0.push({ text: coreType, name: 'Core Type' });
-    if (fields.useCases.length) p0.push({ text: fields.useCases[0], name: 'Use Case' });
-    if (fields.color) p0.push({ text: fields.color, name: 'Color' });
-
+    if (coreType) coreTypeSlot.push({ text: coreType, name: 'Core Type' });
     const wattSpec = fields.numericSpecs.find(s => s.label === 'Wattage');
-    if (wattSpec) p1.push({ text: wattSpec.normalized, name: 'Wattage' });
-    if (fields.capacity) p1.push({ text: fields.capacity, name: 'Capacity' });
-    for (const f of fields.features.slice(0, 2)) p1.push({ text: f, name: f });
-    for (const c of fields.certifications) p1.push({ text: c, name: c });
+    if (wattSpec) specSlot.push({ text: wattSpec.normalized, name: 'Wattage' });
+    if (fields.capacity) specSlot.push({ text: fields.capacity, name: 'Capacity' });
+    for (const f of fields.features.slice(0, 3)) featureSlot.push({ text: f, name: f });
+    if (fields.useCases.length) useCaseSlot.push({ text: fields.useCases[0], name: 'Use Case' });
+    for (const c of fields.certifications) sellingPointSlot.push({ text: c, name: c });
+    if (fields.color) materialColorSlot.push({ text: fields.color, name: 'Color' });
   }
 
   // ===== PHASE 4: ASSEMBLE 3 VERSIONS =====
-  // Clean function: only normalize, never delete content
+  // Structure: Brand → Core Type → Specs → Features → Use Case → Selling Points → Material/Color
   function clean(s) {
     return s.replace(/&/g, 'and').replace(/[,;]+/g, '').replace(/\s+/g, ' ').trim();
   }
 
-  function assemble(p0Fields, p1Fields, p2Fields, version) {
+  function assembleByVersion(version) {
     const parts = [];
-    // Always include ALL P0 fields
-    for (const f of p0Fields) parts.push(f.text);
 
-    // P1 fields: SEO=all, Balanced=all, Readable=selective
-    if (version === 'seo' || version === 'bal') {
-      for (const f of p1Fields) parts.push(f.text);
+    // 1. Brand (always first for Amazon compliance)
+    if (brandSlot.text) parts.push(brandSlot.text);
+
+    // 2. Core Product Type (highest search value, right after brand)
+    for (const f of coreTypeSlot) parts.push(f.text);
+
+    // 3. Key Specs (all for SEO/Bal, top 2 for Readable)
+    if (version === 'read') {
+      for (let i = 0; i < Math.min(2, specSlot.length); i++) parts.push(specSlot[i].text);
     } else {
-      // Readable: only include first 2-3 P1 fields
-      for (let i = 0; i < Math.min(3, p1Fields.length); i++) parts.push(p1Fields[i].text);
+      for (const f of specSlot) parts.push(f.text);
     }
 
-    // P2: only for SEO if space
+    // 4. Features/Functions (all for SEO, top 2 for Bal, top 1 for Readable)
     if (version === 'seo') {
-      for (const f of p2Fields) parts.push(f.text);
+      for (const f of featureSlot) parts.push(f.text);
+    } else if (version === 'bal') {
+      for (let i = 0; i < Math.min(2, featureSlot.length); i++) parts.push(featureSlot[i].text);
+    } else {
+      for (let i = 0; i < Math.min(1, featureSlot.length); i++) parts.push(featureSlot[i].text);
     }
+
+    // 5. Use Cases
+    if (useCaseSlot.length) parts.push(useCaseSlot[0].text);
+
+    // 6. Selling Points / Certifications (SEO=all, Bal=first 2, Read=first 1)
+    if (version === 'seo') {
+      for (const f of sellingPointSlot) parts.push(f.text);
+    } else if (version === 'bal') {
+      for (let i = 0; i < Math.min(2, sellingPointSlot.length); i++) parts.push(sellingPointSlot[i].text);
+    } else {
+      for (let i = 0; i < Math.min(1, sellingPointSlot.length); i++) parts.push(sellingPointSlot[i].text);
+    }
+
+    // 7. Material / Color (always last)
+    for (const f of materialColorSlot) parts.push(f.text);
 
     let title = clean(parts.join(' '));
 
-    // Trim from end ONLY P2/P1 fields if over max (never trim P0)
-    const maxLen = version === 'seo' ? 200 : version === 'bal' ? 180 : 160;
+    // Trim from end if over max (only remove color/material then selling points, never core content)
+    const maxLen = version === 'seo' ? 200 : version === 'bal' ? 180 : 165;
     if (title.length > maxLen) {
-      // Remove P2 fields one by one from the end
-      for (const f of [...p2Fields].reverse()) {
+      for (const f of [...materialColorSlot].reverse()) {
         if (title.length <= maxLen) break;
         const fClean = clean(f.text);
         const idx = title.lastIndexOf(fClean);
         if (idx > -1) title = clean(title.slice(0, idx) + title.slice(idx + fClean.length));
       }
-      // If still too long, remove P1 from end
-      if (title.length > maxLen) {
-        for (const f of [...p1Fields].reverse()) {
-          if (title.length <= maxLen) break;
-          const fClean = clean(f.text);
-          const idx = title.lastIndexOf(fClean);
-          if (idx > -1 && idx > title.indexOf(clean(p0Fields[p0Fields.length - 1]?.text || ''))) {
-            title = clean(title.slice(0, idx) + title.slice(idx + fClean.length));
-          }
-        }
+      for (const f of [...sellingPointSlot].reverse()) {
+        if (title.length <= maxLen) break;
+        const fClean = clean(f.text);
+        const idx = title.lastIndexOf(fClean);
+        if (idx > -1) title = clean(title.slice(0, idx) + title.slice(idx + fClean.length));
+      }
+      for (const f of [...featureSlot].reverse()) {
+        if (title.length <= maxLen) break;
+        const fClean = clean(f.text);
+        const idx = title.lastIndexOf(fClean);
+        if (idx > -1) title = clean(title.slice(0, idx) + title.slice(idx + fClean.length));
       }
     }
 
     return title;
   }
 
-  let seoTitle = assemble(p0, p1, p2, 'seo');
-  let readTitle = assemble(p0, p1, p2, 'read');
-  let balTitle = assemble(p0, p1, p2, 'bal');
+  let seoTitle = assembleByVersion('seo');
+  let readTitle = assembleByVersion('read');
+  let balTitle = assembleByVersion('bal');
 
-  // ===== PHASE 5: QUALITY CHECKS =====
+  // ===== PHASE 5: BUILD CHANGE EXPLANATIONS =====
+  function explainChanges(original, optimized) {
+    const changes = [];
+    const origLower = original.toLowerCase();
+
+    // Brand position
+    if (fields.brand && origLower.startsWith(fields.brand.toLowerCase())) {
+      changes.push(`品牌名"${fields.brand}"保留在标题首位，符合Amazon品牌前置规范`);
+    } else if (fields.brand) {
+      changes.push(`品牌名"${fields.brand}"移至标题首位，确保品牌识别和Amazon合规`);
+    }
+
+    // & → and
+    if (original.includes('&') && !optimized.includes('&')) {
+      changes.push('将 & 替换为 and，符合亚马逊标题规范');
+    }
+
+    // % → Percent
+    if (/[\d.]+%/.test(original) && !/[\d.]+%/.test(optimized)) {
+      changes.push('将百分号(%)替换为 Percent，避免特殊字符问题');
+    }
+
+    // Commas removed
+    if (/,/.test(original) && !/,/.test(optimized)) {
+      changes.push('移除逗号分隔，改为空格连接，减少堆砌感');
+    }
+
+    // Parentheses removed
+    if (/\(/.test(original) && !/\(/.test(optimized)) {
+      changes.push('移除括号，将颜色/变体信息自然融入标题尾部');
+    }
+
+    // Duplicate word reduction
+    const origWords = origLower.split(/\s+/);
+    const origCounts = {};
+    origWords.forEach(w => { if (w.length > 3) origCounts[w] = (origCounts[w] || 0) + 1; });
+    const optWords = optimized.toLowerCase().split(/\s+/);
+    const optCounts = {};
+    optWords.forEach(w => { if (w.length > 3) optCounts[w] = (optCounts[w] || 0) + 1; });
+    const reduced = Object.entries(origCounts).filter(([w, c]) => c > 2 && (optCounts[w] || 0) < c);
+    if (reduced.length) {
+      changes.push(`去重: ${reduced.map(([w, c]) => `"${w}"(${c}次→${optCounts[w]||1}次)`).join('、')}，保留首次出现`);
+    }
+
+    // Structure reordering
+    if (coreTypeSlot.length > 0 && fields.brand) {
+      const brandIdx = origLower.indexOf(fields.brand.toLowerCase());
+      const coreIdx = origLower.indexOf(coreTypeSlot[0].text.toLowerCase().split(' ')[0]);
+      if (brandIdx > coreIdx && coreIdx > -1) {
+        changes.push(`重组顺序为: 品牌→核心产品词→规格→功能→场景→卖点→颜色，提升品牌识别和搜索效率`);
+      }
+    }
+
+    if (changes.length === 0) {
+      changes.push('标题结构已优化，保持核心信息完整，符合Amazon标题规范');
+    }
+    return changes;
+  }
+
+  const seoExplanation = explainChanges(originalTitle, seoTitle);
+  const readExplanation = explainChanges(originalTitle, readTitle);
+  const balExplanation = explainChanges(originalTitle, balTitle);
+
+  // ===== PHASE 6: QUALITY CHECKS =====
   function checkQuality(title, version) {
     const c = {};
     c.charCount = title.length;
     c.brandFirst = fields.brand ? title.toLowerCase().startsWith(fields.brand.toLowerCase()) : true;
+    c.brandIncluded = fields.brand ? title.toLowerCase().includes(fields.brand.toLowerCase()) : true;
+    c.coreTypePresent = coreTypeSlot.length > 0 ? title.toLowerCase().includes(coreTypeSlot[0].text.toLowerCase().split(' ')[0]) : true;
 
-    // Target ranges
     const targets = {
       seo: { min: 160, max: 190 },
       read: { min: 110, max: 160 },
@@ -639,25 +707,28 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
     };
     const t = targets[version] || targets.bal;
 
-    // P0 coverage
+    // Field coverage across all slots
     c.coveredKeywords = [];
     c.missingP0 = [];
-    for (const f of p0) {
-      if (title.toLowerCase().includes(f.text.toLowerCase().split(' ')[0])) {
+    const mandatorySlots = [brandSlot, ...coreTypeSlot, ...specSlot.slice(0, 2), ...featureSlot.slice(0, 1)];
+    for (const f of mandatorySlots) {
+      if (!f.text) continue;
+      const checkWord = f.text.split(' ')[0].toLowerCase();
+      if (title.toLowerCase().includes(checkWord)) {
         c.coveredKeywords.push(f.name);
       } else {
         c.missingP0.push(f.name);
       }
     }
-    // Also check P1
-    for (const f of p1) {
-      if (title.toLowerCase().includes(f.text.toLowerCase().split(' ')[0])) {
-        c.coveredKeywords.push(f.name);
-      }
+    // Also report covered P1 fields
+    const optionalSlots = [...specSlot.slice(2), ...featureSlot.slice(1), ...useCaseSlot, ...sellingPointSlot, ...materialColorSlot];
+    for (const f of optionalSlots) {
+      if (!f.text) continue;
+      const checkWord = f.text.split(' ')[0].toLowerCase();
+      if (title.toLowerCase().includes(checkWord)) c.coveredKeywords.push(f.name);
     }
-    if (fields.color && title.toLowerCase().includes(fields.color.toLowerCase())) c.coveredKeywords.push('Color');
 
-    // Parameter integrity: verify all numbers from original title appear in output
+    // Parameter integrity
     c.paramIntegrity = true;
     c.alteredParams = [];
     for (const spec of fields.numericSpecs) {
@@ -672,9 +743,7 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
     c.coreWordIntegrity = true;
     c.droppedCoreWords = [];
     for (const pt of fields.productTypes) {
-      // Check if the core noun from each product type appears
-      const coreWord = pt.split(' ').pop(); // e.g., "Machine", "Shaver", "Maker"
-      const precedingWord = pt.split(' ').slice(-2, -1)[0]; // e.g., "Cone", "Ice"
+      const precedingWord = pt.split(' ').slice(-2, -1)[0];
       if (precedingWord && !title.toLowerCase().includes(precedingWord.toLowerCase())) {
         c.coreWordIntegrity = false;
         c.droppedCoreWords.push(pt);
@@ -689,15 +758,12 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
       }
     }
 
-    // Special chars
     c.hasSpecialChars = /["""\u201c\u201d\u2033&%]/.test(title);
 
-    // Repeated words (3+ of same word)
     const wc = {};
     title.toLowerCase().split(/\s+/).forEach(w => { const wl = w.replace(/[.,;:]/g, ''); if (wl.length > 3) wc[wl] = (wc[wl] || 0) + 1; });
     c.repeatedWords = Object.entries(wc).filter(([, v]) => v > 2).map(([w]) => w);
 
-    // Parameter claims needing verification
     c.parameterClaims = [];
     for (const spec of fields.numericSpecs) {
       if (title.includes(spec.value.replace(/,/g, ''))) {
@@ -705,31 +771,29 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
       }
     }
 
-    // Length assessment
     c.tooShort = title.length < 100;
     c.belowTarget = title.length < t.min;
     c.overTarget = title.length > t.max;
 
-    // ===== SCORING =====
-    let score = 10; // Start from 10, max 10
-
-    if (c.charCount >= t.min && c.charCount <= t.max) score -= 0; // perfect
+    // SCORING
+    let score = 10;
+    if (c.charCount >= t.min && c.charCount <= t.max) score -= 0;
     else if (c.charCount < 80) score -= 5;
     else if (c.charCount < 100) score -= 3;
     else if (c.charCount < t.min) score -= 1;
     else if (c.charCount > t.max) score -= 1;
 
     if (!c.brandFirst) score -= 1;
+    if (!c.coreTypePresent) score -= 2;
     if (c.missingP0.length > 0) score -= Math.min(c.missingP0.length * 2, 4);
-    if (!c.paramIntegrity) score -= 4; // Parameter altered = severe
-    if (!c.coreWordIntegrity) score -= 4; // Core word dropped = severe
+    if (!c.paramIntegrity) score -= 4;
+    if (!c.coreWordIntegrity) score -= 4;
     if (c.droppedCertifications.length > 0) score -= Math.min(c.droppedCertifications.length * 2, 3);
     if (c.hasSpecialChars) score -= 1;
     if (c.repeatedWords.length > 0) score -= 1;
 
     score = Math.max(0, Math.min(10, score));
 
-    // Grade mapping
     if (!c.paramIntegrity || !c.coreWordIntegrity) c.qualityGrade = 'Poor';
     else if (score >= 9) c.qualityGrade = 'Optimized';
     else if (score >= 7 && c.missingP0.length === 0) c.qualityGrade = 'Great';
@@ -744,7 +808,7 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
   const readChecks = checkQuality(readTitle, 'read');
   const balChecks = checkQuality(balTitle, 'bal');
 
-  // ===== PHASE 6: BUILD WARNINGS =====
+  // ===== PHASE 7: BUILD WARNINGS =====
   function buildWarnings(checks) {
     const w = [];
     if (checks.tooShort) w.push({ type: 'yellow', text: '标题偏短，可能损失搜索词覆盖，建议补充核心功能参数或使用场景。' });
@@ -759,9 +823,9 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
   }
 
   return [
-    { label: 'SEO优先版', desc: '关键词覆盖最大化，适合新品、广告投放、搜索流量导向', title: seoTitle, charCount: seoTitle.length, qualityGrade: seoChecks.qualityGrade, coveredKeywords: seoChecks.coveredKeywords, missingP0: seoChecks.missingP0, paramIntegrity: seoChecks.paramIntegrity, warnings: buildWarnings(seoChecks) },
-    { label: '可读性优先版', desc: '自然流畅，保留核心功能，适合品牌调性和前台点击', title: readTitle, charCount: readTitle.length, qualityGrade: readChecks.qualityGrade, coveredKeywords: readChecks.coveredKeywords, missingP0: readChecks.missingP0, paramIntegrity: readChecks.paramIntegrity, warnings: buildWarnings(readChecks) },
-    { label: '平衡版', desc: '兼顾SEO、CDQ合规和用户阅读，推荐默认使用', title: balTitle, charCount: balTitle.length, qualityGrade: balChecks.qualityGrade, coveredKeywords: balChecks.coveredKeywords, missingP0: balChecks.missingP0, paramIntegrity: balChecks.paramIntegrity, warnings: buildWarnings(balChecks) },
+    { label: 'SEO优先版', desc: '关键词覆盖最大化，适合新品、广告投放、搜索流量导向', title: seoTitle, charCount: seoTitle.length, qualityGrade: seoChecks.qualityGrade, coveredKeywords: seoChecks.coveredKeywords, missingP0: seoChecks.missingP0, paramIntegrity: seoChecks.paramIntegrity, changes: seoExplanation, warnings: buildWarnings(seoChecks) },
+    { label: '可读性优先版', desc: '自然流畅，保留核心功能，适合品牌调性和前台点击', title: readTitle, charCount: readTitle.length, qualityGrade: readChecks.qualityGrade, coveredKeywords: readChecks.coveredKeywords, missingP0: readChecks.missingP0, paramIntegrity: readChecks.paramIntegrity, changes: readExplanation, warnings: buildWarnings(readChecks) },
+    { label: '平衡版', desc: '兼顾SEO、CDQ合规和用户阅读，推荐默认使用', title: balTitle, charCount: balTitle.length, qualityGrade: balChecks.qualityGrade, coveredKeywords: balChecks.coveredKeywords, missingP0: balChecks.missingP0, paramIntegrity: balChecks.paramIntegrity, changes: balExplanation, warnings: buildWarnings(balChecks) },
   ];
 }
 
