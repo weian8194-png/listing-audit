@@ -9,7 +9,7 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#e6edf3;line-height:1.6;min-height:100vh}
 
 /* Header */
-.hero{background:linear-gradient(135deg,#161b22 0%,#0d1117 50%,#161b22 100%);padding:60px 20px 40px;text-align:center;border-bottom:2px solid #FF9900;position:relative;overflow:hidden}
+.hero{background:linear-gradient(135deg,#161b22 0%,#0d1117 50%,#161b22 100%);padding:50px 20px 36px;text-align:center;border-bottom:2px solid #FF9900;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%,rgba(255,153,0,0.05) 0%,transparent 50%);animation:pulse 4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:0.5}50%{opacity:1}}
 .hero h1{font-size:2.2rem;margin-bottom:8px;position:relative}
@@ -25,6 +25,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .search-box button:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(255,153,0,0.3)}
 .search-box button:active{transform:translateY(0)}
 .search-box button:disabled{opacity:0.6;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* Intro section (shown before audit) */
+.intro{max-width:800px;margin:0 auto;padding:30px 20px;transition:opacity 0.3s}
+.intro.hidden{display:none}
+.intro-title{font-size:1.1rem;font-weight:700;color:#e6edf3;margin-bottom:20px;display:flex;align-items:center;gap:10px;justify-content:center}
+.intro-title .rocket{font-size:1.3rem}
+
+/* Metric cards */
+.metric-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:30px}
+.metric-card{background:#161b22;border-radius:12px;padding:20px;border:1px solid #30363d}
+.metric-card.cdq{border-left:4px solid #e94560}
+.metric-card.lqi{border-left:4px solid #16c79a}
+.metric-card .mc-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.metric-card .mc-name{font-size:1.2rem;font-weight:800;color:#e6edf3}
+.metric-card .mc-tag{font-size:0.7rem;padding:3px 10px;border-radius:10px;font-weight:600}
+.metric-card.cdq .mc-tag{background:rgba(233,69,96,0.15);color:#e94560}
+.metric-card.lqi .mc-tag{background:rgba(22,199,154,0.15);color:#16c79a}
+.metric-card .mc-full{font-size:0.78rem;color:#8b949e;margin-bottom:12px}
+.metric-card .mc-items{list-style:none;padding:0}
+.metric-card .mc-items li{font-size:0.85rem;color:#c9d1d9;padding:4px 0;padding-left:18px;position:relative}
+.metric-card .mc-items li::before{content:'•';position:absolute;left:4px;color:#484f58}
+
+/* Flow steps */
+.flow-steps{background:#161b22;border-radius:12px;padding:24px;border:1px solid #30363d}
+.flow-steps .flow-title{font-size:1rem;font-weight:700;color:#e6edf3;margin-bottom:16px;text-align:center;display:flex;align-items:center;gap:8px;justify-content:center}
+.flow-step{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
+.flow-step:last-child{margin-bottom:0}
+.flow-num{width:28px;height:28px;border-radius:50%;background:#16c79a;color:#111;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0}
+.flow-text{font-size:0.9rem;color:#c9d1d9;padding-top:3px}
+.flow-text strong{color:#e6edf3}
 
 /* Loading */
 .loading{display:none;text-align:center;padding:40px 20px}
@@ -110,6 +140,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   .search-box button{width:100%}
   .meta-grid{grid-template-columns:1fr 1fr}
   .scores-row{gap:20px}
+  .metric-cards{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -121,6 +152,58 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="search-box">
     <input type="text" id="asinInput" placeholder="输入ASIN，例如 B0DQKPLXMB" maxlength="10" autocomplete="off">
     <button id="auditBtn" onclick="runAudit()">开始审计</button>
+  </div>
+</div>
+
+<!-- Intro: metric explanation + usage flow (shown before audit, hidden after) -->
+<div class="intro" id="intro">
+  <div class="metric-cards">
+    <div class="metric-card cdq">
+      <div class="mc-header">
+        <span class="mc-name">CDQ</span>
+        <span class="mc-tag">搜索权重</span>
+      </div>
+      <div class="mc-full">Content Detail Quality — 标题规范、属性饱和度、关键词一致性、降权风险检测</div>
+      <ul class="mc-items">
+        <li>标题特殊字符 &amp; 关键词堆砌检测</li>
+        <li>电压/功率等关键属性一致性校验</li>
+        <li>高权重后台属性缺失扫描</li>
+        <li>标题长度 &amp; 结构优化建议</li>
+      </ul>
+    </div>
+    <div class="metric-card lqi">
+      <div class="mc-header">
+        <span class="mc-name">LQI</span>
+        <span class="mc-tag">转化效率</span>
+      </div>
+      <div class="mc-full">Listing Quality Indicator — 五点质量、图片覆盖、卖点差异化、A+效能评估</div>
+      <ul class="mc-items">
+        <li>五点描述质量 &amp; 品牌套话识别</li>
+        <li>图片/视频/A+完整性检测</li>
+        <li>卖点差异化 &amp; 竞品对比语言</li>
+        <li>数据声明可信度评估</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="flow-steps">
+    <div class="flow-title">🚀 使用流程</div>
+    <div class="flow-step">
+      <span class="flow-num">1</span>
+      <div class="flow-text"><strong>输入ASIN</strong> — 在上方输入框填写10位ASIN编号</div>
+    </div>
+    <div class="flow-step">
+      <span class="flow-num">2</span>
+      <div class="flow-text"><strong>点击"开始审计"</strong> — 系统自动抓取Amazon产品数据</div>
+    </div>
+    <div class="flow-step">
+      <span class="flow-num">3</span>
+      <div class="flow-text"><strong>等待5-15秒</strong> — CDQ合规检查 + LQI转化分析同步执行</div>
+    </div>
+    <div class="flow-step">
+      <span class="flow-num">4</span>
+      <div class="flow-text"><strong>查看报告</strong> — 评分、问题清单、优化建议一键生成</div>
+    </div>
   </div>
 </div>
 
@@ -140,7 +223,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 </div>
 
 <div class="footer">
-  <p>Listing CDQ/LQI Audit Tool · Powered by Vercel · Data fetched from Amazon.com</p>
+  <p>Listing CDQ/LQI Audit Tool · Powered by Vercel + RapidAPI · Data from Amazon.com</p>
 </div>
 
 <script>
@@ -152,6 +235,7 @@ document.getElementById('asinInput').addEventListener('keydown', function(e) {
 
 function newSearch() {
   document.getElementById('report').classList.remove('show');
+  document.getElementById('intro').classList.remove('hidden');
   document.getElementById('asinInput').focus();
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
@@ -162,6 +246,7 @@ async function runAudit() {
   const loading = document.getElementById('loading');
   const errorMsg = document.getElementById('errorMsg');
   const report = document.getElementById('report');
+  const intro = document.getElementById('intro');
 
   if (!asin || asin.length !== 10 || !/^[A-Z0-9]{10}$/.test(asin)) {
     showError('请输入有效的10位ASIN（字母+数字组合）');
@@ -172,7 +257,7 @@ async function runAudit() {
   btn.textContent = '审计中...';
   loading.classList.add('show');
   errorMsg.classList.remove('show');
-  report.classList.remove('show');
+  intro.classList.add('hidden');
 
   const steps = [
     '正在抓取Amazon数据...',
@@ -195,11 +280,13 @@ async function runAudit() {
     loading.classList.remove('show');
 
     if (data.error) {
+      intro.classList.remove('hidden');
       showError(data.error);
       return;
     }
 
     if (!data.audit) {
+      intro.classList.remove('hidden');
       showError('审计引擎未返回有效结果，请稍后重试');
       return;
     }
@@ -211,6 +298,7 @@ async function runAudit() {
   } catch (err) {
     clearInterval(timer);
     loading.classList.remove('show');
+    intro.classList.remove('hidden');
     showError('网络请求失败: ' + err.message);
   } finally {
     btn.disabled = false;
@@ -252,17 +340,27 @@ function renderReport(data) {
   const gradeColors = {Optimized:'#16c79a',Great:'#4ade80',Good:'#FF9900',Fair:'#f59e0b',Poor:'#e94560'};
   const overallColor = gradeColors[a.grade] || '#8b949e';
 
-  // Meta items
+  // Deal type display
+  let dealDisplay = '';
+  if (data.deal_type === 'BD') dealDisplay = '🔥 BD促销';
+  else if (data.deal_type === 'coupon') dealDisplay = '🏷️ 优惠券$' + (data.coupon_amount || '');
+  else dealDisplay = '无优惠';
+
   const metaItems = [
     {label:'ASIN', value:data.asin},
     {label:'品牌', value:esc(data.brand || 'N/A')},
-    {label:'价格', value:'$' + (data.price || 'N/A')},
+    {label:'价格', value:'$' + (data.price || 'N/A') + (data.original_price ? ' (原价$' + data.original_price + ')' : '')},
+    {label:'优惠', value:dealDisplay},
     {label:'评分', value:(data.rating || 'N/A') + ' ★'},
     {label:'评论数', value:data.review_count || 'N/A'},
     {label:'BSR排名', value:'#' + (data.bsr_rank || 'N/A')},
     {label:'图片/视频', value:(data.images_count || 0) + '张' + (data.has_video ? '+ 视频' : '')},
     {label:'A+页面', value:data.has_aplus ? '✅ 有' : '❌ 无'},
+    {label:'销量', value:data.sales_volume || 'N/A'},
   ];
+
+  if (data.is_amazon_choice) metaItems.push({label:'标签', value:'🏆 Amazon\'s Choice'});
+  if (data.is_best_seller) metaItems.push({label:'标签', value:'🥇 Best Seller'});
 
   let metaHtml = metaItems.map(m =>
     `<div class="meta-item"><div class="meta-label">${m.label}</div><div class="meta-value">${m.value}</div></div>`
@@ -305,6 +403,7 @@ function renderReport(data) {
       <div class="meta-grid">${metaHtml}</div>
       <div class="title-display"><strong>标题：</strong>${esc(data.title || 'N/A')}</div>
       ${data.bsr_category ? `<div style="margin-top:8px;color:#8b949e;font-size:0.85rem">类目: ${esc(data.bsr_category)}</div>` : ''}
+      ${data.availability ? `<div style="margin-top:4px;color:#8b949e;font-size:0.85rem">库存: ${esc(data.availability)}</div>` : ''}
       <a href="${data.url || '#'}" target="_blank" class="amazon-link">在Amazon打开 →</a>
     </div>
 
