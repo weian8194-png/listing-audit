@@ -8,7 +8,6 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#e6edf3;line-height:1.6;min-height:100vh}
 
-/* Header */
 .hero{background:linear-gradient(135deg,#161b22 0%,#0d1117 50%,#161b22 100%);padding:50px 20px 36px;text-align:center;border-bottom:2px solid #FF9900;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%,rgba(255,153,0,0.05) 0%,transparent 50%);animation:pulse 4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:0.5}50%{opacity:1}}
@@ -16,131 +15,166 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hero h1 span{color:#FF9900}
 .hero .subtitle{color:#8b949e;font-size:1rem;max-width:600px;margin:0 auto 30px}
 
-/* Search */
 .search-box{max-width:600px;margin:0 auto;display:flex;gap:12px;position:relative}
 .search-box input{flex:1;padding:16px 20px;border:2px solid #30363d;border-radius:12px;background:#161b22;color:#e6edf3;font-size:1.1rem;outline:none;transition:border-color 0.3s}
 .search-box input:focus{border-color:#FF9900}
 .search-box input::placeholder{color:#484f58}
 .search-box button{padding:16px 32px;background:linear-gradient(135deg,#FF9900,#e68a00);color:#000;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;white-space:nowrap}
 .search-box button:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(255,153,0,0.3)}
-.search-box button:active{transform:translateY(0)}
 .search-box button:disabled{opacity:0.6;cursor:not-allowed;transform:none;box-shadow:none}
 
-/* Intro section (shown before audit) */
+/* Intro */
 .intro{max-width:800px;margin:0 auto;padding:30px 20px;transition:opacity 0.3s}
 .intro.hidden{display:none}
-.intro-title{font-size:1.1rem;font-weight:700;color:#e6edf3;margin-bottom:20px;display:flex;align-items:center;gap:10px;justify-content:center}
-.intro-title .rocket{font-size:1.3rem}
-
-/* Metric cards */
 .metric-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:30px}
 .metric-card{background:#161b22;border-radius:12px;padding:20px;border:1px solid #30363d}
 .metric-card.cdq{border-left:4px solid #e94560}
 .metric-card.lqi{border-left:4px solid #16c79a}
-.metric-card .mc-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.metric-card .mc-name{font-size:1.2rem;font-weight:800;color:#e6edf3}
-.metric-card .mc-tag{font-size:0.7rem;padding:3px 10px;border-radius:10px;font-weight:600}
+.mc-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.mc-name{font-size:1.2rem;font-weight:800}
+.mc-tag{font-size:0.7rem;padding:3px 10px;border-radius:10px;font-weight:600}
 .metric-card.cdq .mc-tag{background:rgba(233,69,96,0.15);color:#e94560}
 .metric-card.lqi .mc-tag{background:rgba(22,199,154,0.15);color:#16c79a}
-.metric-card .mc-full{font-size:0.78rem;color:#8b949e;margin-bottom:12px}
-.metric-card .mc-items{list-style:none;padding:0}
-.metric-card .mc-items li{font-size:0.85rem;color:#c9d1d9;padding:4px 0;padding-left:18px;position:relative}
-.metric-card .mc-items li::before{content:'•';position:absolute;left:4px;color:#484f58}
+.mc-full{font-size:0.78rem;color:#8b949e;margin-bottom:12px}
+.mc-items{list-style:none;padding:0}
+.mc-items li{font-size:0.85rem;color:#c9d1d9;padding:4px 0 4px 18px;position:relative}
+.mc-items li::before{content:'•';position:absolute;left:4px;color:#484f58}
 
-/* Flow steps */
 .flow-steps{background:#161b22;border-radius:12px;padding:24px;border:1px solid #30363d}
-.flow-steps .flow-title{font-size:1rem;font-weight:700;color:#e6edf3;margin-bottom:16px;text-align:center;display:flex;align-items:center;gap:8px;justify-content:center}
+.flow-title{font-size:1rem;font-weight:700;margin-bottom:16px;text-align:center;display:flex;align-items:center;gap:8px;justify-content:center}
 .flow-step{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
 .flow-step:last-child{margin-bottom:0}
 .flow-num{width:28px;height:28px;border-radius:50%;background:#16c79a;color:#111;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0}
 .flow-text{font-size:0.9rem;color:#c9d1d9;padding-top:3px}
 .flow-text strong{color:#e6edf3}
 
-/* Loading */
+/* Loading / Error */
 .loading{display:none;text-align:center;padding:40px 20px}
 .loading.show{display:block}
 .spinner{width:48px;height:48px;border:4px solid #30363d;border-top-color:#FF9900;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading p{color:#8b949e;font-size:0.95rem}
 
-/* Error */
 .error-msg{display:none;max-width:700px;margin:20px auto;padding:20px;background:#2d1b1b;border:1px solid #e94560;border-radius:12px;text-align:center}
 .error-msg.show{display:block}
 .error-msg h3{color:#e94560;margin-bottom:8px}
 
-/* Report Container */
-.report{display:none;max-width:920px;margin:0 auto;padding:20px}
+/* Report */
+.report{display:none;max-width:960px;margin:0 auto;padding:20px}
 .report.show{display:block}
 
-/* Sections */
 .section{background:#161b22;border-radius:12px;padding:25px;margin-bottom:20px;border:1px solid #30363d}
-.section-title{font-size:1.15rem;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:8px}
+.section-title{font-size:1.1rem;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:8px}
 
-/* Meta grid */
-.meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-.meta-item{background:#0d1117;padding:12px;border-radius:8px;border:1px solid #21262d}
-.meta-label{color:#8b949e;font-size:0.75rem;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px}
-.meta-value{font-weight:600;font-size:1rem}
-
-/* Title display */
-.title-display{margin-top:15px;color:#8b949e;font-size:0.9rem;line-height:1.6}
+/* Meta */
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.meta-item{background:#0d1117;padding:10px;border-radius:8px;border:1px solid #21262d}
+.meta-label{color:#8b949e;font-size:0.7rem;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px}
+.meta-value{font-weight:600;font-size:0.9rem}
+.title-display{margin-top:12px;color:#8b949e;font-size:0.85rem;line-height:1.6}
 .title-display strong{color:#e6edf3}
+.amazon-link{display:inline-block;margin-top:10px;color:#FF9900;text-decoration:none;font-size:0.85rem;font-weight:500}
+.amazon-link:hover{text-decoration:underline}
 
-/* Scores */
-.scores-row{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin:20px 0}
+/* Scores with sub-dimensions */
+.scores-row{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;margin:20px 0}
 .ring-box{text-align:center}
-.ring-wrap{position:relative;width:110px;height:110px;margin:0 auto}
-.ring-wrap svg{width:110px;height:110px}
-.ring-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.6rem;font-weight:800}
-.ring-label{margin-top:8px;font-size:0.85rem;color:#8b949e}
-.grade-badge{display:inline-block;padding:10px 28px;border-radius:20px;font-size:1.2rem;font-weight:700;margin-top:12px}
-.g-optimized{background:#16c79a;color:#111}
-.g-great{background:#4ade80;color:#111}
-.g-good{background:#FF9900;color:#111}
-.g-fair{background:#f59e0b;color:#111}
-.g-poor{background:#e94560;color:#fff}
+.ring-wrap{position:relative;width:100px;height:100px;margin:0 auto}
+.ring-wrap svg{width:100px;height:100px}
+.ring-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.4rem;font-weight:800}
+.ring-label{margin-top:6px;font-size:0.8rem;color:#8b949e}
+.grade-badge{display:inline-block;padding:8px 24px;border-radius:20px;font-size:1.1rem;font-weight:700;margin-top:10px}
+.g-optimized{background:#16c79a;color:#111}.g-great{background:#4ade80;color:#111}.g-good{background:#FF9900;color:#111}.g-fair{background:#f59e0b;color:#111}.g-poor{background:#e94560;color:#fff}
 
-/* Issues */
-.issue-card{display:flex;gap:12px;padding:14px;border-radius:8px;margin-bottom:10px;align-items:flex-start}
-.cdq-issue{background:#1a1520;border-left:4px solid #e94560}
-.lqi-issue{background:#1a1d15;border-left:4px solid #f59e0b}
-.issue-num{background:#30363d;color:#58a6ff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;flex-shrink:0}
-.issue-title{font-weight:600;margin-bottom:4px;font-size:0.95rem}
-.issue-detail{color:#8b949e;font-size:0.88rem}
+/* Sub-dimension bars */
+.sub-dims{margin-top:16px}
+.sub-dim-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sub-dim-name{width:80px;font-size:0.78rem;color:#8b949e;text-align:right;flex-shrink:0}
+.sub-dim-bar{flex:1;height:20px;background:#21262d;border-radius:4px;overflow:hidden;position:relative}
+.sub-dim-fill{height:100%;border-radius:4px;transition:width 0.5s}
+.sub-dim-score{width:50px;font-size:0.85rem;font-weight:700;text-align:left;flex-shrink:0}
 
-/* Title optimization */
-.title-before{background:#1a1520;border:1px solid #e94560;padding:14px;border-radius:8px;line-height:1.5;font-size:0.9rem;margin-bottom:12px}
-.title-after{background:#1a1d15;border:1px solid #16c79a;padding:14px;border-radius:8px;line-height:1.5;font-size:0.9rem}
-.arrow-down{text-align:center;font-size:1.8rem;color:#16c79a;margin:8px 0}
+/* Issues with priority + impact + fix */
+.issue-card{padding:16px;border-radius:8px;margin-bottom:12px;align-items:flex-start}
+.issue-critical{background:#2d1b1b;border-left:4px solid #e94560}
+.issue-high{background:#1a1520;border-left:4px solid #f59e0b}
+.issue-medium{background:#1a1d15;border-left:4px solid #58a6ff}
+.issue-low{background:#161b22;border-left:4px solid #484f58}
+.issue-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.issue-level{font-size:0.7rem;padding:2px 8px;border-radius:10px;font-weight:600}
+.level-critical{background:rgba(233,69,96,0.2);color:#e94560}
+.level-high{background:rgba(245,158,11,0.2);color:#f59e0b}
+.level-medium{background:rgba(88,166,255,0.2);color:#58a6ff}
+.level-low{background:rgba(72,79,88,0.2);color:#8b949e}
+.issue-dim{font-size:0.7rem;padding:2px 8px;border-radius:10px;background:rgba(139,148,158,0.1);color:#8b949e}
+.issue-title-text{font-weight:700;font-size:0.95rem}
+.issue-detail{font-size:0.85rem;margin-bottom:6px}
+.issue-impact{font-size:0.82rem;color:#f59e0b;margin-bottom:4px;padding-left:16px}
+.issue-impact::before{content:'⚡ 影响：';font-weight:700}
+.issue-fix{font-size:0.82rem;color:#16c79a;padding-left:16px}
+.issue-fix::before{content:'🔧 修复：';font-weight:700}
+.issue-deduction{font-size:0.75rem;color:#e94560;float:right}
 
-/* Bullets */
-.bullet-item{display:flex;gap:10px;padding:10px;background:#0d1117;border-radius:6px;margin-bottom:8px;align-items:flex-start;font-size:0.9rem}
-.bullet-num{background:#30363d;color:#58a6ff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0}
+/* Title options */
+.title-option{background:#0d1117;border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid #30363d}
+.title-option-label{font-size:0.8rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.title-option-desc{font-size:0.75rem;color:#8b949e;margin-bottom:8px}
+.title-option-text{font-size:0.88rem;color:#e6edf3;line-height:1.5;padding:10px;background:#161b22;border-radius:6px;border:1px solid #30363d}
+.title-option-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.title-option-chars{font-size:0.75rem;color:#8b949e}
+.copy-btn{padding:4px 12px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-size:0.75rem;cursor:pointer}
+.copy-btn:hover{background:#30363d}
+
+/* Bullet Before/After */
+.bullet-compare{background:#0d1117;border-radius:8px;padding:16px;margin-bottom:12px;border:1px solid #21262d}
+.bullet-compare-header{font-size:0.85rem;font-weight:700;margin-bottom:8px}
+.ba-row{display:flex;gap:12px;align-items:flex-start}
+.ba-col{flex:1;min-width:0}
+.ba-label{font-size:0.7rem;font-weight:700;margin-bottom:4px;padding:2px 8px;border-radius:4px;display:inline-block}
+.ba-before-label{background:rgba(233,69,96,0.15);color:#e94560}
+.ba-after-label{background:rgba(22,199,154,0.15);color:#16c79a}
+.ba-text{font-size:0.82rem;color:#c9d1d9;line-height:1.5;padding:8px;border-radius:4px}
+.ba-text-before{background:#1a1520;border:1px solid #3d1f2e}
+.ba-text-after{background:#1a1d15;border:1px solid #1d3d1f}
+.bullet-changes{margin-top:6px;padding-left:16px}
+.bullet-change{font-size:0.78rem;color:#8b949e;padding:2px 0}
+.no-change-msg{font-size:0.82rem;color:#484f58;font-style:italic;padding:8px}
+
+/* Completeness table */
+.completeness-table{width:100%;border-collapse:collapse}
+.completeness-table td{padding:8px 10px;border-bottom:1px solid #21262d;font-size:0.85rem}
+.ct-status{font-weight:600}
+.ct-yes{color:#16c79a}
+.ct-no{color:#484f58}
+.ct-note{color:#8b949e;font-size:0.78rem}
 
 /* Specs table */
 .specs-table{width:100%;border-collapse:collapse}
-.specs-table td{padding:10px 12px;border-bottom:1px solid #21262d;font-size:0.88rem}
+.specs-table td{padding:8px 10px;border-bottom:1px solid #21262d;font-size:0.85rem}
 .spec-key{color:#8b949e;width:40%}
 .spec-val{color:#e6edf3}
 
-/* Footer */
-.footer{text-align:center;padding:30px;color:#484f58;font-size:0.8rem;border-top:1px solid #21262d;margin-top:20px}
+/* Export bar */
+.export-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.export-btn{padding:8px 16px;border-radius:8px;border:1px solid #30363d;font-size:0.85rem;cursor:pointer;transition:background 0.2s;display:flex;align-items:center;gap:6px}
+.export-btn:hover{background:#30363d}
+.export-btn-pdf{background:#2d1b1b;color:#e94560;border-color:#e94560}
+.export-btn-csv{background:#1a1d15;color:#16c79a;border-color:#16c79a}
+.export-btn-md{background:#1a1520;color:#58a6ff;border-color:#58a6ff}
 
-/* Amazon link */
-.amazon-link{display:inline-block;margin-top:12px;color:#FF9900;text-decoration:none;font-size:0.9rem;font-weight:500}
-.amazon-link:hover{text-decoration:underline}
-
-/* New search button */
 .new-search{display:block;margin:0 auto 20px;padding:10px 24px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:8px;font-size:0.9rem;cursor:pointer;transition:background 0.2s}
 .new-search:hover{background:#30363d}
+
+.footer{text-align:center;padding:30px;color:#484f58;font-size:0.8rem;border-top:1px solid #21262d;margin-top:20px}
 
 @media(max-width:600px){
   .hero h1{font-size:1.5rem}
   .search-box{flex-direction:column}
   .search-box button{width:100%}
   .meta-grid{grid-template-columns:1fr 1fr}
-  .scores-row{gap:20px}
+  .scores-row{gap:15px}
   .metric-cards{grid-template-columns:1fr}
+  .ba-row{flex-direction:column}
 }
 </style>
 </head>
@@ -148,90 +182,58 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <div class="hero">
   <h1>🔍 Listing <span>CDQ/LQI</span> 深度审计</h1>
-  <p class="subtitle">输入ASIN，自动抓取Amazon数据并生成合规性+转化率双维度诊断报告</p>
+  <p class="subtitle">输入ASIN，自动生成合规性+转化率双维度可解释诊断报告</p>
   <div class="search-box">
     <input type="text" id="asinInput" placeholder="输入ASIN，例如 B0DQKPLXMB" maxlength="10" autocomplete="off">
     <button id="auditBtn" onclick="runAudit()">开始审计</button>
   </div>
 </div>
 
-<!-- Intro: metric explanation + usage flow (shown before audit, hidden after) -->
 <div class="intro" id="intro">
   <div class="metric-cards">
     <div class="metric-card cdq">
-      <div class="mc-header">
-        <span class="mc-name">CDQ</span>
-        <span class="mc-tag">搜索权重</span>
-      </div>
-      <div class="mc-full">Content Detail Quality — 标题规范、属性饱和度、关键词一致性、降权风险检测</div>
+      <div class="mc-header"><span class="mc-name">CDQ</span><span class="mc-tag">搜索权重</span></div>
+      <div class="mc-full">Content Detail Quality — 标题规范(30分) + 属性饱和度(30分) + 数据一致性(40分)</div>
       <ul class="mc-items">
         <li>标题特殊字符 &amp; 关键词堆砌检测</li>
         <li>电压/功率等关键属性一致性校验</li>
         <li>高权重后台属性缺失扫描</li>
-        <li>标题长度 &amp; 结构优化建议</li>
+        <li>品牌前置 &amp; 标题结构合规</li>
       </ul>
     </div>
     <div class="metric-card lqi">
-      <div class="mc-header">
-        <span class="mc-name">LQI</span>
-        <span class="mc-tag">转化效率</span>
-      </div>
-      <div class="mc-full">Listing Quality Indicator — 五点质量、图片覆盖、卖点差异化、A+效能评估</div>
+      <div class="mc-header"><span class="mc-name">LQI</span><span class="mc-tag">转化效率</span></div>
+      <div class="mc-full">Listing Quality Indicator — 内容质量(35分) + 媒体覆盖(35分) + 差异化表达(30分)</div>
       <ul class="mc-items">
         <li>五点描述质量 &amp; 品牌套话识别</li>
         <li>图片/视频/A+完整性检测</li>
         <li>卖点差异化 &amp; 竞品对比语言</li>
-        <li>数据声明可信度评估</li>
+        <li>利益导向结构 &amp; 数据声明可信度</li>
       </ul>
     </div>
   </div>
-
   <div class="flow-steps">
     <div class="flow-title">🚀 使用流程</div>
-    <div class="flow-step">
-      <span class="flow-num">1</span>
-      <div class="flow-text"><strong>输入ASIN</strong> — 在上方输入框填写10位ASIN编号</div>
-    </div>
-    <div class="flow-step">
-      <span class="flow-num">2</span>
-      <div class="flow-text"><strong>点击"开始审计"</strong> — 系统自动抓取Amazon产品数据</div>
-    </div>
-    <div class="flow-step">
-      <span class="flow-num">3</span>
-      <div class="flow-text"><strong>等待5-15秒</strong> — CDQ合规检查 + LQI转化分析同步执行</div>
-    </div>
-    <div class="flow-step">
-      <span class="flow-num">4</span>
-      <div class="flow-text"><strong>查看报告</strong> — 评分、问题清单、优化建议一键生成</div>
-    </div>
+    <div class="flow-step"><span class="flow-num">1</span><div class="flow-text"><strong>输入ASIN</strong> — 在上方输入框填写10位ASIN编号</div></div>
+    <div class="flow-step"><span class="flow-num">2</span><div class="flow-text"><strong>点击"开始审计"</strong> — 系统自动抓取Amazon产品数据</div></div>
+    <div class="flow-step"><span class="flow-num">3</span><div class="flow-text"><strong>等待5-15秒</strong> — CDQ + LQI 双维度分析同步执行</div></div>
+    <div class="flow-step"><span class="flow-num">4</span><div class="flow-text"><strong>查看报告</strong> — 可解释评分 + 问题清单 + 修复路径 + 优化建议</div></div>
   </div>
 </div>
 
-<div class="loading" id="loading">
-  <div class="spinner"></div>
-  <p id="loadingText">正在抓取Amazon数据...</p>
-</div>
-
-<div class="error-msg" id="errorMsg">
-  <h3>❌ 审计失败</h3>
-  <p id="errorText"></p>
-</div>
-
+<div class="loading" id="loading"><div class="spinner"></div><p id="loadingText">正在抓取Amazon数据...</p></div>
+<div class="error-msg" id="errorMsg"><h3>❌ 审计失败</h3><p id="errorText"></p></div>
 <div class="report" id="report">
   <button class="new-search" onclick="newSearch()">← 审计新的ASIN</button>
   <div id="reportContent"></div>
 </div>
-
-<div class="footer">
-  <p>Listing CDQ/LQI Audit Tool · Powered by Vercel + RapidAPI · Data from Amazon.com</p>
-</div>
+<div class="footer"><p>Listing CDQ/LQI Audit Tool v2 · Powered by Vercel + RapidAPI · Data from Amazon.com</p></div>
 
 <script>
 const API_URL = '/api/audit';
+let currentData = null;
 
-document.getElementById('asinInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') runAudit();
-});
+document.getElementById('asinInput').addEventListener('keydown', e => { if (e.key === 'Enter') runAudit(); });
 
 function newSearch() {
   document.getElementById('report').classList.remove('show');
@@ -243,95 +245,64 @@ function newSearch() {
 async function runAudit() {
   const asin = document.getElementById('asinInput').value.trim().toUpperCase();
   const btn = document.getElementById('auditBtn');
-  const loading = document.getElementById('loading');
-  const errorMsg = document.getElementById('errorMsg');
-  const report = document.getElementById('report');
-  const intro = document.getElementById('intro');
+  if (!asin || asin.length !== 10 || !/^[A-Z0-9]{10}$/.test(asin)) { showError('请输入有效的10位ASIN'); return; }
 
-  if (!asin || asin.length !== 10 || !/^[A-Z0-9]{10}$/.test(asin)) {
-    showError('请输入有效的10位ASIN（字母+数字组合）');
-    return;
-  }
+  btn.disabled = true; btn.textContent = '审计中...';
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('errorMsg').classList.remove('show');
+  document.getElementById('intro').classList.add('hidden');
 
-  btn.disabled = true;
-  btn.textContent = '审计中...';
-  loading.classList.add('show');
-  errorMsg.classList.remove('show');
-  intro.classList.add('hidden');
-
-  const steps = [
-    '正在抓取Amazon数据...',
-    '解析产品页面...',
-    '执行CDQ合规性检查...',
-    '执行LQI转化率分析...',
-    '生成审计报告...'
-  ];
+  const steps = ['正在抓取Amazon数据...','解析产品页面...','执行CDQ合规性检查...','执行LQI转化率分析...','生成可解释诊断报告...'];
   let step = 0;
-  const timer = setInterval(() => {
-    step = (step + 1) % steps.length;
-    document.getElementById('loadingText').textContent = steps[step];
-  }, 2000);
+  const timer = setInterval(() => { step = (step + 1) % steps.length; document.getElementById('loadingText').textContent = steps[step]; }, 2000);
 
   try {
     const resp = await fetch(`${API_URL}?asin=${asin}`);
     const data = await resp.json();
-
     clearInterval(timer);
-    loading.classList.remove('show');
+    document.getElementById('loading').classList.remove('show');
 
-    if (data.error) {
-      intro.classList.remove('hidden');
-      showError(data.error);
-      return;
-    }
+    if (data.error) { document.getElementById('intro').classList.remove('hidden'); showError(data.error); return; }
+    if (!data.audit) { document.getElementById('intro').classList.remove('hidden'); showError('审计引擎未返回有效结果'); return; }
 
-    if (!data.audit) {
-      intro.classList.remove('hidden');
-      showError('审计引擎未返回有效结果，请稍后重试');
-      return;
-    }
-
+    currentData = data;
     renderReport(data);
-    report.classList.add('show');
+    document.getElementById('report').classList.add('show');
     window.scrollTo({top: document.querySelector('.hero').offsetHeight, behavior: 'smooth'});
-
   } catch (err) {
     clearInterval(timer);
-    loading.classList.remove('show');
-    intro.classList.remove('hidden');
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('intro').classList.remove('hidden');
     showError('网络请求失败: ' + err.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = '开始审计';
+    btn.disabled = false; btn.textContent = '开始审计';
   }
 }
 
-function showError(msg) {
-  document.getElementById('errorText').textContent = msg;
-  document.getElementById('errorMsg').classList.add('show');
+function showError(msg) { document.getElementById('errorText').textContent = msg; document.getElementById('errorMsg').classList.add('show'); }
+function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+function makeRing(score, max, color, label) {
+  const pct = score / max;
+  const circ = 2 * Math.PI * 38;
+  const offset = circ * (1 - pct);
+  return `<div class="ring-box"><div class="ring-wrap">
+    <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="none" stroke="#30363d" stroke-width="7"/>
+    <circle cx="50" cy="50" r="38" fill="none" stroke="${color}" stroke-width="7" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" transform="rotate(-90 50 50)" stroke-linecap="round"/></svg>
+    <div class="ring-num" style="color:${color}">${score}</div></div><div class="ring-label">${label} (满分${max})</div></div>`;
 }
 
-function esc(text) {
-  const d = document.createElement('div');
-  d.textContent = text;
-  return d.innerHTML;
+function makeSubBar(score, max, color) {
+  const pct = Math.round(score / max * 100);
+  return `<div class="sub-dim-row"><div class="sub-dim-name">${esc(score)+'/'+max}</div>
+    <div class="sub-dim-bar"><div class="sub-dim-fill" style="width:${pct}%;background:${color}"></div></div>
+    <div class="sub-dim-score" style="color:${color}">${pct}%</div></div>`;
 }
 
-function makeRing(score, color, label) {
-  const circ = 2 * Math.PI * 42;
-  const offset = circ * (1 - score / 100);
-  return `<div class="ring-box">
-    <div class="ring-wrap">
-      <svg viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="42" fill="none" stroke="#30363d" stroke-width="8"/>
-        <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="8"
-          stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
-          transform="rotate(-90 50 50)" stroke-linecap="round"/>
-      </svg>
-      <div class="ring-num" style="color:${color}">${score}</div>
-    </div>
-    <div class="ring-label">${label}</div>
-  </div>`;
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent; btn.textContent = '已复制!'; setTimeout(() => btn.textContent = orig, 1500);
+  });
 }
 
 function renderReport(data) {
@@ -340,124 +311,190 @@ function renderReport(data) {
   const gradeColors = {Optimized:'#16c79a',Great:'#4ade80',Good:'#FF9900',Fair:'#f59e0b',Poor:'#e94560'};
   const overallColor = gradeColors[a.grade] || '#8b949e';
 
-  // Deal type display
-  let dealDisplay = '';
+  // Meta
+  let dealDisplay = '无优惠';
   if (data.deal_type === 'BD') dealDisplay = '🔥 BD促销';
-  else if (data.deal_type === 'coupon') dealDisplay = '🏷️ 优惠券$' + (data.coupon_amount || '');
-  else dealDisplay = '无优惠';
-
   const metaItems = [
-    {label:'ASIN', value:data.asin},
-    {label:'品牌', value:esc(data.brand || 'N/A')},
-    {label:'价格', value:'$' + (data.price || 'N/A') + (data.original_price ? ' (原价$' + data.original_price + ')' : '')},
-    {label:'优惠', value:dealDisplay},
-    {label:'评分', value:(data.rating || 'N/A') + ' ★'},
-    {label:'评论数', value:data.review_count || 'N/A'},
-    {label:'BSR排名', value:'#' + (data.bsr_rank || 'N/A')},
-    {label:'图片/视频', value:(data.images_count || 0) + '张' + (data.has_video ? '+ 视频' : '')},
-    {label:'A+页面', value:data.has_aplus ? '✅ 有' : '❌ 无'},
-    {label:'销量', value:data.sales_volume || 'N/A'},
+    {l:'ASIN',v:data.asin},{l:'品牌',v:esc(data.brand||'N/A')},
+    {l:'价格',v:'$'+(data.price||'N/A')+(data.original_price?' (原$'+data.original_price+')':'')},
+    {l:'优惠',v:dealDisplay},{l:'评分',v:(data.rating||'N/A')+' ★'},{l:'评论',v:data.review_count||'N/A'},
+    {l:'BSR',v:'#'+(data.bsr_rank||'N/A')},{l:'图片/视频',v:(data.images_count||0)+'张'+(data.has_video?'+视频':'')},
+    {l:'A+',v:data.has_aplus?'✅':'❌'},{l:'销量',v:data.sales_volume||'N/A'},
   ];
+  if (data.is_amazon_choice) metaItems.push({l:'标签',v:"🏆 Choice"});
+  if (data.is_best_seller) metaItems.push({l:'标签',v:'🥇 Best Seller'});
 
-  if (data.is_amazon_choice) metaItems.push({label:'标签', value:'🏆 Amazon\'s Choice'});
-  if (data.is_best_seller) metaItems.push({label:'标签', value:'🥇 Best Seller'});
+  let html = '';
 
-  let metaHtml = metaItems.map(m =>
-    `<div class="meta-item"><div class="meta-label">${m.label}</div><div class="meta-value">${m.value}</div></div>`
-  ).join('');
+  // Export bar
+  html += `<div class="export-bar">
+    <button class="export-btn export-btn-pdf" onclick="exportPDF()">📄 导出PDF</button>
+    <button class="export-btn export-btn-csv" onclick="exportCSV()">📊 导出CSV</button>
+    <button class="export-btn export-btn-md" onclick="exportMD()">📝 复制Markdown</button>
+  </div>`;
 
-  // CDQ issues
-  const levelIcons = {critical:'🔴',high:'⚠️',medium:'🟡',low:'ℹ️'};
-  let cdqHtml = a.cdq_issues.length ? a.cdq_issues.map((iss, i) =>
-    `<div class="issue-card cdq-issue"><div class="issue-num">${i+1}</div><div>
-      <div class="issue-title">${levelIcons[iss.level]||'ℹ️'} ${esc(iss.title)}</div>
-      <div class="issue-detail">${esc(iss.detail)}</div></div></div>`
-  ).join('') : '<p style="color:#16c79a">✅ 未发现明显CDQ降权风险</p>';
+  // Basic info
+  html += `<div class="section"><h2 class="section-title">📋 产品基本信息</h2>
+    <div class="meta-grid">${metaItems.map(m=>`<div class="meta-item"><div class="meta-label">${m.l}</div><div class="meta-value">${m.v}</div></div>`).join('')}</div>
+    <div class="title-display"><strong>标题：</strong>${esc(data.title||'N/A')}</div>
+    ${data.bsr_category?`<div style="margin-top:6px;color:#8b949e;font-size:0.8rem">类目: ${esc(data.bsr_category)}</div>`:''}
+    <a href="${data.url||'#'}" target="_blank" class="amazon-link">在Amazon打开 →</a></div>`;
 
-  // LQI issues
-  const lqiIcons = {high:'❌',medium:'⚠️',low:'💡'};
-  let lqiHtml = a.lqi_issues.length ? a.lqi_issues.map((iss, i) =>
-    `<div class="issue-card lqi-issue"><div class="issue-num">${i+1}</div><div>
-      <div class="issue-title">${lqiIcons[iss.level]||'ℹ️'} ${esc(iss.title)}</div>
-      <div class="issue-detail">${esc(iss.detail)}</div></div></div>`
-  ).join('') : '<p style="color:#16c79a">✅ 未发现明显LQI转化流失</p>';
-
-  // Bullets
-  let bulletsHtml = (data.bullets || []).map((b, i) =>
-    `<div class="bullet-item"><span class="bullet-num">${i+1}</span><span>${esc(b.substring(0, 150) + (b.length > 150 ? '...' : ''))}</span></div>`
-  ).join('');
-
-  // Specs
-  let specsHtml = '';
-  if (data.tech_specs && Object.keys(data.tech_specs).length) {
-    specsHtml = Object.entries(data.tech_specs).map(([k, v]) =>
-      `<tr><td class="spec-key">${esc(k)}</td><td class="spec-val">${esc(v)}</td></tr>`
-    ).join('');
-  } else {
-    specsHtml = '<tr><td colspan="2" style="color:#8b949e;text-align:center;padding:20px">未抓取到技术规格</td></tr>';
+  // Completeness
+  if (data.completeness) {
+    const c = data.completeness;
+    html += `<div class="section"><h2 class="section-title">📡 数据抓取完整度 (${c.fetched}/${c.total} = ${c.percentage}%)</h2>
+      <table class="completeness-table">${c.modules.map(m=>`<tr>
+        <td style="width:120px;font-weight:600">${m.label}</td>
+        <td style="width:80px" class="ct-status ${m.fetched?'ct-yes':'ct-no'}">${m.fetched?'✅ 已抓取':'⏳ 未抓取'}</td>
+        <td class="ct-note">${m.note}</td></tr>`).join('')}</table></div>`;
   }
 
-  const html = `
-    <div class="section">
-      <h2 class="section-title">📋 产品基本信息</h2>
-      <div class="meta-grid">${metaHtml}</div>
-      <div class="title-display"><strong>标题：</strong>${esc(data.title || 'N/A')}</div>
-      ${data.bsr_category ? `<div style="margin-top:8px;color:#8b949e;font-size:0.85rem">类目: ${esc(data.bsr_category)}</div>` : ''}
-      ${data.availability ? `<div style="margin-top:4px;color:#8b949e;font-size:0.85rem">库存: ${esc(data.availability)}</div>` : ''}
-      <a href="${data.url || '#'}" target="_blank" class="amazon-link">在Amazon打开 →</a>
+  // Scores with sub-dimensions
+  html += `<div class="section"><h2 class="section-title">📊 综合评分</h2>
+    <div class="scores-row">
+      ${makeRing(a.cdq_score, 100, '#e94560', 'CDQ 合规')}
+      ${makeRing(a.lqi_score, 100, '#16c79a', 'LQI 转化')}
+      ${makeRing(a.overall_score, 100, overallColor, '综合')}
     </div>
+    <div style="text-align:center"><span class="grade-badge ${gradeClass}">等级: ${a.grade}</span></div>
+    <div class="sub-dims" style="margin-top:24px">
+      <div style="font-size:0.85rem;font-weight:700;color:#e94560;margin-bottom:8px">CDQ 子维度</div>
+      ${a.cdq_dimensions.map(d => `<div class="sub-dim-row"><div class="sub-dim-name">${d.name}</div>
+        <div class="sub-dim-bar"><div class="sub-dim-fill" style="width:${Math.round(d.score/d.max*100)}%;background:${d.score/d.max>0.7?'#e94560':d.score/d.max>0.4?'#f59e0b':'#484f58'}"></div></div>
+        <div class="sub-dim-score" style="color:#e94560">${d.score}/${d.max}</div></div>`).join('')}
+      <div style="font-size:0.85rem;font-weight:700;color:#16c79a;margin:12px 0 8px">LQI 子维度</div>
+      ${a.lqi_dimensions.map(d => `<div class="sub-dim-row"><div class="sub-dim-name">${d.name}</div>
+        <div class="sub-dim-bar"><div class="sub-dim-fill" style="width:${Math.round(d.score/d.max*100)}%;background:${d.score/d.max>0.7?'#16c79a':d.score/d.max>0.4?'#f59e0b':'#484f58'}"></div></div>
+        <div class="sub-dim-score" style="color:#16c79a">${d.score}/${d.max}</div></div>`).join('')}
+    </div></div>`;
 
-    <div class="section">
-      <h2 class="section-title">📊 综合评分</h2>
-      <div class="scores-row">
-        ${makeRing(a.cdq_score, '#e94560', 'CDQ 合规')}
-        ${makeRing(a.lqi_score, '#16c79a', 'LQI 转化')}
-        ${makeRing(a.overall_score, overallColor, '综合')}
+  // All issues sorted by priority
+  const levelLabels = {critical:'🔴 紧急',high:'⚠️ 高',medium:'🟡 中',low:'ℹ️ 低'};
+  html += `<div class="section"><h2 class="section-title">🔍 问题清单（按优先级排序，共${a.all_issues.length}项）</h2>
+    ${a.all_issues.map(iss => `<div class="issue-card issue-${iss.level}">
+      <div class="issue-header">
+        <span class="issue-level level-${iss.level}">${levelLabels[iss.level]||iss.level}</span>
+        <span class="issue-dim">${iss.dimension}</span>
+        <span class="issue-title-text">${esc(iss.title)}</span>
+        <span class="issue-deduction">-${iss.deduction}分</span>
       </div>
-      <div style="text-align:center">
-        <span class="grade-badge ${gradeClass}">当前等级: ${a.grade}</span>
-      </div>
-    </div>
+      <div class="issue-impact">${esc(iss.impact)}</div>
+      <div class="issue-fix">${esc(iss.fix)}</div>
+    </div>`).join('')}</div>`;
 
-    <div class="section">
-      <h2 class="section-title">🔴 CDQ降权风险（${a.cdq_issues.length}项）</h2>
-      ${cdqHtml}
-    </div>
+  // Title options
+  html += `<div class="section"><h2 class="section-title">✏️ 标题优化（${a.title_options.length}个候选方案）</h2>
+    <div style="margin-bottom:12px;color:#8b949e;font-size:0.85rem"><strong>原始标题：</strong>${esc(data.title||'N/A')}</div>
+    ${a.title_options.map((opt,i) => `<div class="title-option">
+      <div class="title-option-label"><span style="color:${i===2?'#16c79a':'#58a6ff'}">${i===2?'⭐ ':''}${opt.label}</span></div>
+      <div class="title-option-desc">${opt.desc}</div>
+      <div class="title-option-text" id="titleOpt${i}">${esc(opt.title)}</div>
+      <div class="title-option-meta">
+        <span class="title-option-chars">${opt.charCount} 字符 ${opt.charCount>=150&&opt.charCount<=200?'✅':'⚠️'}</span>
+        <button class="copy-btn" onclick="copyText(document.getElementById('titleOpt${i}').textContent,this)">📋 复制</button>
+      </div></div>`).join('')}</div>`;
 
-    <div class="section">
-      <h2 class="section-title">🟡 LQI转化流失点（${a.lqi_issues.length}项）</h2>
-      ${lqiHtml}
-    </div>
+  // Bullet Before/After
+  if (a.bullet_rewrites && a.bullet_rewrites.length > 0) {
+    html += `<div class="section"><h2 class="section-title">📝 五点描述优化（Before/After）</h2>
+      ${a.bullet_rewrites.map(br => `<div class="bullet-compare">
+        <div class="bullet-compare-header">第${br.index}条 ${br.hasChange?'<span style="color:#16c79a">有优化建议</span>':'<span style="color:#484f58">无需修改</span>'}</div>
+        ${br.hasChange ? `<div class="ba-row">
+          <div class="ba-col"><div class="ba-label ba-before-label">Before</div>
+            <div class="ba-text ba-text-before">${esc(br.before.substring(0,200))}${br.before.length>200?'...':''}</div></div>
+          <div class="ba-col"><div class="ba-label ba-after-label">After</div>
+            <div class="ba-text ba-text-after" id="bullet${br.index}">${esc(br.after.substring(0,300))}${br.after.length>300?'...':''}</div></div>
+        </div>
+        <div class="bullet-changes">${br.changes.map(c=>`<div class="bullet-change">→ ${esc(c)}</div>`).join('')}</div>
+        <div style="margin-top:6px"><button class="copy-btn" onclick="copyText(document.getElementById('bullet${br.index}').textContent,this)">📋 复制优化版</button></div>`
+        : `<div class="no-change-msg">此条质量尚可，暂无优化建议</div>`}
+      </div>`).join('')}</div>`;
+  }
 
-    <div class="section">
-      <h2 class="section-title">✏️ 标题优化</h2>
-      <div class="title-before"><strong>Before:</strong> ${esc(data.title || 'N/A')}</div>
-      <div class="arrow-down">↓</div>
-      <div class="title-after"><strong>After:</strong> ${esc(a.optimized_title || 'N/A')}</div>
-    </div>
+  // Specs
+  if (data.tech_specs && Object.keys(data.tech_specs).length) {
+    html += `<div class="section"><h2 class="section-title">⚙️ 技术规格</h2>
+      <table class="specs-table">${Object.entries(data.tech_specs).map(([k,v])=>`<tr><td class="spec-key">${esc(k)}</td><td class="spec-val">${esc(v)}</td></tr>`).join('')}</table></div>`;
+  }
 
-    <div class="section">
-      <h2 class="section-title">📝 当前五点描述</h2>
-      ${bulletsHtml || '<p style="color:#8b949e">未能抓取五点描述</p>'}
-    </div>
-
-    <div class="section">
-      <h2 class="section-title">⚙️ 技术规格</h2>
-      <table class="specs-table">${specsHtml}</table>
-    </div>
-
-    <div class="section">
-      <h2 class="section-title">💡 优化建议总结</h2>
-      <div style="color:#8b949e;font-size:0.9rem;line-height:1.8">
-        <p>1. <strong style="color:#e94560">紧急修复CDQ降权项</strong>：${a.cdq_issues.filter(i=>i.level==='critical'||i.level==='high').length}项高危问题需立即处理</p>
-        <p>2. <strong style="color:#f59e0b">补全缺失后台属性</strong>：提升CDQ字段饱和度，增加系统收录概率</p>
-        <p>3. <strong style="color:#16c79a">优化LQI转化要素</strong>：${a.lqi_issues.filter(i=>i.level==='high').length}项关键转化流失点待修复</p>
-        <p>4. <strong style="color:#58a6ff">标题SEO优化</strong>：去特殊字符+去重+补足150-200字符</p>
-      </div>
-    </div>
-  `;
+  // Summary
+  const criticalHigh = a.all_issues.filter(i=>i.level==='critical'||i.level==='high').length;
+  const medium = a.all_issues.filter(i=>i.level==='medium').length;
+  html += `<div class="section"><h2 class="section-title">💡 优化建议总结</h2>
+    <div style="color:#c9d1d9;font-size:0.9rem;line-height:2">
+      <p>1. <strong style="color:#e94560">🔴 紧急/高危项(${criticalHigh}个)</strong>：立即修复，直接导致降权或退货</p>
+      <p>2. <strong style="color:#f59e0b">🟡 中优先级(${medium}个)</strong>：补全属性和内容，提升字段饱和度</p>
+      <p>3. <strong style="color:#16c79a">🟢 标题优化</strong>：从3个候选版本中选择，推荐"平衡版"</p>
+      <p>4. <strong style="color:#58a6ff">🔵 五点改写</strong>：逐条替换After版本，品牌套话优先替换</p>
+      <p>5. <strong style="color:#8b949e">⚪ 媒体补全</strong>：图片补至9+张，上传产品视频，创建A+页面</p>
+    </div></div>`;
 
   document.getElementById('reportContent').innerHTML = html;
+}
+
+// ===== EXPORT FUNCTIONS =====
+function exportPDF() {
+  window.print();
+}
+
+function exportCSV() {
+  if (!currentData || !currentData.audit) return;
+  const d = currentData, a = d.audit;
+  let csv = 'Category,Item,Value\n';
+  csv += `Basic,ASIN,${d.asin}\n`;
+  csv += `Basic,Brand,${d.brand||'N/A'}\n`;
+  csv += `Basic,Price,$${d.price||'N/A'}\n`;
+  csv += `Basic,Rating,${d.rating||'N/A'}\n`;
+  csv += `Basic,Reviews,${d.review_count||'N/A'}\n`;
+  csv += `Score,CDQ,${a.cdq_score}/100\n`;
+  csv += `Score,LQI,${a.lqi_score}/100\n`;
+  csv += `Score,Overall,${a.overall_score}/100\n`;
+  csv += `Score,Grade,${a.grade}\n`;
+  a.cdq_dimensions.forEach(dim => { csv += `CDQ Sub,${dim.name},${dim.score}/${dim.max}\n`; });
+  a.lqi_dimensions.forEach(dim => { csv += `LQI Sub,${dim.name},${dim.score}/${dim.max}\n`; });
+  a.all_issues.forEach((iss,i) => {
+    csv += `Issue ${i+1},${iss.level},"${iss.title.replace(/"/g,'""')}","${iss.fix.replace(/"/g,'""')}",-${iss.deduction}\n`;
+  });
+  a.title_options.forEach(opt => {
+    csv += `Title Option,${opt.label},"${opt.title.replace(/"/g,'""')}",${opt.charCount} chars\n`;
+  });
+
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = `listing-audit-${d.asin}.csv`; link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportMD() {
+  if (!currentData || !currentData.audit) return;
+  const d = currentData, a = d.audit;
+  let md = `# Listing审计报告: ${d.asin}\n\n`;
+  md += `**品牌**: ${d.brand||'N/A'} | **价格**: $${d.price||'N/A'} | **评分**: ${d.rating||'N/A'}★ | **评论**: ${d.review_count||'N/A'}\n\n`;
+  md += `## 评分\n| 维度 | 得分 | 满分 |\n|------|------|------|\n`;
+  md += `| CDQ 合规 | ${a.cdq_score} | 100 |\n| LQI 转化 | ${a.lqi_score} | 100 |\n| 综合 | ${a.overall_score} | 100 |\n| 等级 | ${a.grade} | - |\n\n`;
+  md += `## CDQ子维度\n| 子维度 | 得分 | 满分 |\n|--------|------|------|\n`;
+  a.cdq_dimensions.forEach(dim => { md += `| ${dim.name} | ${dim.score} | ${dim.max} |\n`; });
+  md += `\n## LQI子维度\n| 子维度 | 得分 | 满分 |\n|--------|------|------|\n`;
+  a.lqi_dimensions.forEach(dim => { md += `| ${dim.name} | ${dim.score} | ${dim.max} |\n`; });
+  md += `\n## 问题清单(${a.all_issues.length}项)\n| 优先级 | 问题 | 修复建议 | 扣分 |\n|--------|------|----------|------|\n`;
+  a.all_issues.forEach(iss => { md += `| ${iss.level} | ${iss.title} | ${iss.fix} | -${iss.deduction} |\n`; });
+  md += `\n## 标题优化\n`;
+  a.title_options.forEach(opt => { md += `### ${opt.label} (${opt.charCount}字符)\n${opt.title}\n\n`; });
+  md += `\n## 五点描述优化\n`;
+  a.bullet_rewrites.forEach(br => {
+    if (br.hasChange) { md += `### 第${br.index}条\n**Before**: ${br.before}\n\n**After**: ${br.after}\n\n`; }
+  });
+  md += `\n---\n*Generated by Listing CDQ/LQI Audit Tool*\n`;
+
+  navigator.clipboard.writeText(md).then(() => alert('Markdown已复制到剪贴板！')).catch(() => {
+    const blob = new Blob([md], {type:'text/markdown'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `listing-audit-${d.asin}.md`; link.click();
+    URL.revokeObjectURL(url);
+  });
 }
 </script>
 </body>
