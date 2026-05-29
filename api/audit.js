@@ -170,7 +170,7 @@ function hasComparativeLanguage(bullets) {
 function classifyBulletOpening(bulletText) {
   if (!bulletText) return 'feature';
   const colonMatch = bulletText.match(/^([^:]{2,50}):/);
-  const opening = colonMatch ? colonMatch[1].strip().toLowerCase() : bulletText.slice(0, 50).toLowerCase();
+  const opening = colonMatch ? colonMatch[1].trim().toLowerCase() : bulletText.slice(0, 50).toLowerCase();
 
   const benefitPatterns = [
     /^(save|stay|enjoy|keep|get|make|create|protect|prevent|avoid|eliminate|reduce|maximize|minimize|never|always|easily|quickly|safely|effortlessly)/,
