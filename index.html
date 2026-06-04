@@ -111,8 +111,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <body>
 
 <div class="hero">
-  <h1>🔍 Listing <span>CDQ/LQI</span> 深度审计<span class="version-tag">v7</span></h1>
-  <p class="subtitle">输入ASIN，自动抓取Amazon数据并生成合规性+转化率双维度诊断报告</p>
+  <h1>🔍 Listing <span>CDQ/LQI</span> 深度审计<span class="version-tag">v3.0</span></h1>
+  <p class="subtitle">输入ASIN，输入ASIN，自动抓取Amazon数据 — 只做硬性纠错，不做文案润色</p>
   <div class="search-box">
     <input type="text" id="asinInput" placeholder="输入ASIN，例如 B0DQKPLXMB" maxlength="10" autocomplete="off">
     <button id="auditBtn" onclick="runAudit()">开始审计</button>
@@ -135,7 +135,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 </div>
 
 <div class="footer">
-  <p>Listing CDQ/LQI Audit Tool v7 · Powered by Vercel · Data fetched from Amazon.com</p>
+  <p>Listing CDQ/LQI Audit Tool v3.0 · 硬性纠错，不做文案润色 · Powered by Vercel</p>
 </div>
 
 <script>
@@ -287,7 +287,7 @@ function renderReport(data) {
 
   // Bullets display with opening type
   let bulletsHtml = (data.bullets || []).map((b, i) => {
-    const bulletOpts = (a.bullet_optimization || [])[i];
+    // V3.0: bullet_optimization removed
     const typeClass = bulletOpts ? (bulletOpts.opening_type === 'benefit' ? 'type-benefit' : 'type-feature') : '';
     const typeLabel = bulletOpts ? (bulletOpts.opening_type === 'benefit' ? '利益导向' : '功能导向') : '';
     return `<div class="bullet-item">
@@ -301,7 +301,7 @@ function renderReport(data) {
 
   // Bullet optimization suggestions
   let bulletOptHtml = '';
-  const bulletOpts = a.bullet_optimization || [];
+  // V3.0: bullet_optimization removed
   if (bulletOpts.length > 0) {
     const featureBullets = bulletOpts.filter(b => b.opening_type === 'feature');
     if (featureBullets.length > 0) {
@@ -318,12 +318,12 @@ function renderReport(data) {
         </div>`;
       }).join('');
     } else {
-      bulletOptHtml = '<p style="color:#4ade80">✅ 所有五点开头均为利益导向，表现良好</p>';
+  // V3.0: bullet opening analysis removed
     }
   }
 
   // Title options (v7 returns 3 versions instead of single optimized_title)
-  const titleOptions = a.title_options || [];
+  // V3.0: title_options removed
   let titleOptHtml = '';
   if (titleOptions.length > 0) {
     titleOptHtml = `
@@ -426,33 +426,23 @@ function renderReport(data) {
     </div>
 
     <div class="section">
-      <h2 class="section-title">✏️ 标题优化</h2>
-      ${titleOptHtml}
-    </div>
-
-    <div class="section">
-      <h2 class="section-title">📝 当前五点描述</h2>
+      <!-- V3.0: 标题优化section已移除 -->
+            <h2 class="section-title">📝 当前五点描述</h2>
       ${bulletsHtml || '<p style="color:#8b949e">未能抓取五点描述</p>'}
     </div>
 
     ${bulletOptHtml ? `<div class="section">
-      <h2 class="section-title">💡 五点开头优化建议</h2>
-      ${bulletOptHtml}
-    </div>` : ''}
-
-    <div class="section">
-      <h2 class="section-title">⚙️ 技术规格（Product Information）</h2>
+      <!-- V3.0: 五点开头优化建议section已移除 -->
+            <h2 class="section-title">⚙️ 技术规格（Product Information）</h2>
       <table class="specs-table">${specsHtml}</table>
     </div>
 
     <div class="section">
-      <h2 class="section-title">📌 优化建议总结</h2>
+      <h2 class="section-title">📌 审计总结</h2>
       <div style="color:#8b949e;font-size:0.9rem;line-height:1.8">
         <p>1. <strong style="color:#e94560">紧急修复CDQ降权项</strong>：${cdqIssues.filter(i=>i.level==='critical'||i.level==='high').length}项高危问题需立即处理</p>
-        <p>2. <strong style="color:#f59e0b">补全缺失后台属性</strong>：提升CDQ字段饱和度，增加系统收录概率</p>
-        <p>3. <strong style="color:#16c79a">优化LQI转化要素</strong>：${lqiIssues.filter(i=>i.level==='high').length}项关键转化流失点待修复</p>
-        <p>4. <strong style="color:#58a6ff">标题SEO优化</strong>：按7位结构重组，去特殊字符+去重+补足150-200字符</p>
-        ${bulletOpts.filter(b=>b.opening_type==='feature').length > 0 ? `<p>5. <strong style="color:#f59e0b">五点开头改利益导向</strong>：${bulletOpts.filter(b=>b.opening_type==='feature').length}条功能导向开头建议改为利益导向</p>` : ''}
+        <p>2. <strong style="color:#16c79a">修复LQI硬性错误</strong>：${lqiIssues.filter(i=>i.level==='high').length}项拼写/语法硬伤待修正</p>
+        ${lqiIssues.filter(i=>i.level==='high').length === 0 && cdqIssues.filter(i=>i.level==='critical'||i.level==='high').length === 0 ? '<p style="color:#16c79a">✅ 校验通过，未发现拼写或语法硬伤</p>' : ''}
       </div>
     </div>
   `;
