@@ -242,61 +242,21 @@ function auditListing(data) {
     dim.score = Math.max(0, dim.score - deduction);
     dim.issues.push({ level, title: title_text, impact, fix, deduction });
   }
-  if (/["""\u201c\u201d\u2033]/.test(title)) {
+  // V3.1: 只做拼写准确性校准，禁止字符仅限 !$?_{ }^¬¦
+  const forbiddenChars = /[!$?_{ }^¬¦]/;
+  if (forbiddenChars.test(title)) {
+    const found = [...new Set(title.match(/[!$?_{ }^¬¦]/g))].join(' ');
     addIssue(
       cdqTitleCompliance,
       8,
       "high",
-      "\u6807\u9898\u542B\u7279\u6B8A\u5B57\u7B26(\u5F15\u53F7/\u82F1\u5BF8\u7B26\u53F7)",
-      "CDQ\u7CFB\u7EDF\u53EF\u80FD\u89E3\u6790\u5F02\u5E38\uFF0C\u5BFC\u81F4\u5C5E\u6027\u7F3A\u5931\u6216\u7D22\u5F15\u5931\u8D25",
-      '\u5C06 " \u548C \u2033 \u66FF\u6362\u4E3A Inch\uFF0C\u5C06\u5F15\u53F7\u5185\u5BB9\u6539\u4E3A\u77ED\u6A2A\u7EBF\u8FDE\u63A5'
+      `标题含禁止字符(${found})`,
+      "亚马逊标题规范禁止使用 ! $ ? _ { } ^ ¬ ¦，可能导致Listing被拒或降权",
+      `移除禁止字符: ${found}，用空格或连字符替代`
     );
   }
-  const wordCounts = {};
-  titleLower.split(/\s+/).forEach((w) => {
-    if (w.length > 3) wordCounts[w] = (wordCounts[w] || 0) + 1;
-  });
-  const repeated = Object.entries(wordCounts).filter(([, v]) => v > 1);
-  if (repeated.length) {
-    addIssue(
-      cdqTitleCompliance,
-      7,
-      "high",
-      `\u6807\u9898\u5173\u952E\u8BCD\u91CD\u590D(${repeated.length}\u7EC4)`,
-      "\u4E9A\u9A6C\u900A\u89C6\u4E3A\u5173\u952E\u8BCD\u5806\u780C\uFF0C\u53EF\u80FD\u964D\u6743\u6216\u9650\u5236\u5C55\u793A",
-      `\u53BB\u9664\u91CD\u590D\u8BCD: ${repeated.map(([k, v]) => `${k}(${v}\u6B21)`).join(", ")}\uFF0C\u6BCF\u8BCD\u4EC5\u4FDD\u75591\u6B21`
-    );
-  }
-  if (title.length < 80) {
-    addIssue(
-      cdqTitleCompliance,
-      5,
-      "medium",
-      `\u6807\u9898\u504F\u77ED(${title.length}\u5B57\u7B26)`,
-      "\u6D6A\u8D39\u641C\u7D22\u6743\u91CD\u7A7A\u95F4\uFF0C\u5C11\u4E86150+\u5B57\u7B26\u53EF\u643A\u5E26\u7684\u5173\u952E\u8BCD",
-      `\u8865\u5145\u81F3150-200\u5B57\u7B26\uFF0C\u4F18\u5148\u6DFB\u52A0\u7528\u9014/\u573A\u666F/\u6750\u8D28/\u989C\u8272\u7B49\u5C5E\u6027`
-    );
-  } else if (title.length > 200) {
-    addIssue(
-      cdqTitleCompliance,
-      8,
-      "high",
-      `\u6807\u9898\u8FC7\u957F(${title.length}\u5B57\u7B26)`,
-      "\u8D85200\u5B57\u7B26\u88AB\u622A\u65AD\uFF0C\u5C3E\u90E8\u5173\u952E\u8BCD\u65E0\u6548\uFF0C\u5806\u780C\u98CE\u9669\u9AD8",
-      "\u7CBE\u7B80\u81F3200\u5B57\u7B26\u5185\uFF0C\u4FDD\u7559\u6838\u5FC3\u5173\u952E\u8BCD\uFF0C\u5220\u9664\u5197\u4F59\u4FEE\u9970"
-    );
-  }
-  const brandInTitle = data.brand && data.brand !== "N/A" && titleLower.startsWith(data.brand.toLowerCase());
-  if (!brandInTitle && data.brand && data.brand !== "N/A") {
-    addIssue(
-      cdqTitleCompliance,
-      5,
-      "medium",
-      "\u54C1\u724C\u540D\u672A\u5728\u6807\u9898\u9996\u4F4D",
-      "\u54C1\u724C\u524D\u7F6E\u63D0\u5347\u641C\u7D22\u6743\u91CD\u548C\u54C1\u724C\u8BA4\u77E5\uFF0CCDQ\u63A8\u8350\u683C\u5F0FBrand+Core+Specs",
-      `\u5C06 "${data.brand}" \u79FB\u5230\u6807\u9898\u6700\u524D\u9762`
-    );
-  }
+  // V3.1: 以下检查已移除（不做优化建议，只做拼写校准）
+  // - 关键词重复检测、标题长度检查、品牌位置检查
   const voltageResult = findAttrInListing("voltage", title, bullets, specs);
   let voltageVal = "";
   for (const [k, v] of Object.entries(specs)) {
@@ -332,16 +292,7 @@ function auditListing(data) {
       `\u7EDF\u4E00\u4E3A\u4E00\u4E2A\u503C: ${Object.entries(wattageVals).map(([k, v]) => `${k}=${v}`).join(", ")}\uFF0C\u5EFA\u8BAE\u4EE5\u989D\u5B9A\u529F\u7387\u4E3A\u51C6`
     );
   }
-  if (/[\d.]+%/.test(title)) {
-    addIssue(
-      cdqDataConsistency,
-      5,
-      "medium",
-      "\u6807\u9898\u542B\u767E\u5206\u53F7(%)",
-      "\u4E9A\u9A6C\u900A\u6807\u9898\u89C4\u8303\u5EFA\u8BAE\u907F\u514D\u7279\u6B8A\u7B26\u53F7\uFF0C\u767E\u5206\u53F7\u53EF\u80FD\u89E6\u53D1CDQ\u89E3\u6790\u95EE\u9898",
-      "\u5C06\u767E\u5206\u53F7\u6539\u4E3A Percent\uFF0C\u5982 99.6% \u2192 99.6 Percent"
-    );
-  }
+  // V3.1: 百分号(%)允许使用，不再标记为问题
   const commonMisspellings = [
     [/stainless\s+steal/i, "Stainless Steel"],
     [/dishwasher\s+saft/i, "Dishwasher Safe"],
@@ -596,7 +547,7 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
     { re: /(\d+\.?\d*)\s*Quarts?\b/i, norm: (v) => v + " Quart", label: "Capacity" },
     { re: /(\d+\.?\d*)\s*RPM/i, norm: (v) => v + " RPM", label: "Speed" },
     { re: /(\d+\.?\d*)\s*(?:["""\u2033]|Inch)/i, norm: (v) => v + " Inch", label: "Size" },
-    { re: /(\d+\.?\d*)%/i, norm: (v) => v + " Percent", label: "Percentage" }
+    { re: /(\d+\.?\d*)%/i, norm: (v) => v + "%", label: "Percentage" }
   ];
   const seenLabels = {};
   for (const { re, norm, label } of numExtractors) {
@@ -670,7 +621,7 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
   else if (/commercial/i.test(originalTitle)) fields.useCases.push("Commercial Use");
   if (fields.useCases.length === 0) {
     const forM = originalTitle.match(/for\s+([A-Za-z\s&]+?)(?:\s*[,(]|\s*$)/i);
-    if (forM) fields.useCases.push("for " + forM[1].trim().replace(/&/g, "and"));
+    if (forM) fields.useCases.push("for " + forM[1].trim());
   }
   if (/professional/i.test(originalTitle)) fields.modifiers.push("Professional");
   if (/commercial/i.test(originalTitle)) fields.modifiers.push("Commercial");
@@ -749,7 +700,7 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
     if (fields.color) materialColorSlot.push({ text: fields.color, name: "Color" });
   }
   function clean(s) {
-    return s.replace(/&/g, "and").replace(/[,;]+/g, "").replace(/\s+/g, " ").trim();
+    return s.replace(/\s+/g, " ").trim();
   }
   function assembleByVersion(version) {
     const parts = [];
@@ -803,9 +754,7 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
     } else if (fields.brand) {
       changes.push(`\u54C1\u724C\u540D"${fields.brand}"\u79FB\u81F3\u6807\u9898\u9996\u4F4D`);
     }
-    if (original.includes("&") && !optimized.includes("&")) changes.push("\u5C06 & \u66FF\u6362\u4E3A and");
-    if (/[\d.]+%/.test(original) && !/[\d.]+%/.test(optimized)) changes.push("\u5C06\u767E\u5206\u53F7\u66FF\u6362\u4E3A Percent");
-    if (/,/.test(original) && !/,/.test(optimized)) changes.push("\u79FB\u9664\u9017\u53F7\uFF0C\u6539\u4E3A\u7A7A\u683C\u8FDE\u63A5");
+    // V3.1: &允许使用，不再替换为and
     if (/\(/.test(original) && !/\(/.test(optimized)) changes.push("\u79FB\u9664\u62EC\u53F7\uFF0C\u989C\u8272\u81EA\u7136\u878D\u5165\u6807\u9898\u5C3E\u90E8");
     const origCounts = {};
     origLower.split(/\s+/).forEach((w) => {
@@ -848,7 +797,7 @@ function generateTitleOptions(originalTitle, brand, specs, bulletsText) {
       const checkWord = f.text.split(" ")[0].toLowerCase();
       if (!title.toLowerCase().includes(checkWord)) c.trimmedFields.push(f.name);
     }
-    c.hasSpecialChars = /["""\u201c\u201d\u2033&%]/.test(title);
+    c.hasSpecialChars = /[!$?_{ }^¬¦]/.test(title);
     const wc = {};
     title.toLowerCase().split(/\s+/).forEach((w) => {
       const wl = w.replace(/[.,;:]/g, "");
@@ -931,10 +880,7 @@ function rewriteBullets(bullets, titleLower, specs) {
         }
       }
     }
-    if (/[\d.]+%/.test(rewritten)) {
-      rewritten = rewritten.replace(/(\d+\.?\d*)%/g, "$1 Percent");
-      changes.push({ type: "compliance", desc: "\u767E\u5206\u53F7\u66FF\u6362\u4E3APercent" });
-    }
+    // V3.1: 百分号%允许使用，不再替换为Percent
     if (titleLower.includes("bpa") && i === 0 && !origLower.includes("bpa")) {
       rewritten = `BPA-FREE & SAFE: ${rewritten}`;
       changes.push({ type: "keyword", desc: "\u6807\u9898\u63D0\u53CABPA-Free\u4F46\u4E94\u70B9\u672A\u5C55\u5F00" });
